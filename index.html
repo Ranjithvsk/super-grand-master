@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Grand Master — Chess Trainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflow-x:hidden}
+
+/* TOP NAV - exact lichess */
+#top{height:44px;background:#2b2825;display:flex;align-items:center;padding:0 8px;position:relative;z-index:10}
+#top .site-title{display:flex;align-items:center;gap:6px;padding:0 8px;cursor:pointer}
+#top .site-title span{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.5px}
+#top .site-buttons{display:flex;margin-left:auto;gap:2px}
+#top .site-buttons a{padding:8px 14px;color:#999;font-size:14px;font-weight:600;cursor:pointer;border-radius:3px;text-decoration:none;border:none;background:none}
+#top .site-buttons a:hover{color:#fff;background:rgba(255,255,255,.07)}
+#top .site-buttons a.active{color:#ddd;background:rgba(255,255,255,.1)}
+
+/* PUZZLE LAYOUT - exact lichess */
+.puzzle{display:flex;justify-content:center;padding:0}
+.puzzle__board{position:relative}
+.puzzle__board .cg-wrap{width:min(calc(100vh - 120px), 640px);aspect-ratio:1;position:relative}
+
+/* BOARD */
+.cg-wrap{display:grid;grid-template-columns:repeat(8,12.5%);grid-template-rows:repeat(8,12.5%);user-select:none;-webkit-user-select:none;touch-action:none;border-radius:0}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+/* Lichess brown board colors */
+.sq.light{background:#f0d9b5}
+.sq.dark{background:#b58863}
+.sq.light.lastmove{background:#cdd26a}
+.sq.dark.lastmove{background:#aaa23b}
+.sq.light.selected{background:#819669}
+.sq.dark.selected{background:#646d40}
+.sq.light.check{background:radial-gradient(ellipse at center,rgba(255,0,0,.9) 0%,rgba(231,0,0,.65) 25%,rgba(169,0,0,0) 89%),#f0d9b5}
+.sq.dark.check{background:radial-gradient(ellipse at center,rgba(255,0,0,.9) 0%,rgba(231,0,0,.65) 25%,rgba(169,0,0,0) 89%),#b58863}
+
+/* Piece images - actual Lichess SVGs */
+.sq .piece-img{width:100%;height:100%;position:absolute;top:0;left:0;background-size:cover;background-repeat:no-repeat;pointer-events:none;z-index:2}
+
+/* Move hints - lichess green dots */
+.sq .move-dot{position:absolute;width:32%;height:32%;border-radius:50%;background:rgba(20,85,30,.5);z-index:3}
+.sq .capture-ring{position:absolute;width:100%;height:100%;border-radius:50%;z-index:3}
+.sq .capture-ring::after{content:'';position:absolute;top:3%;left:3%;right:3%;bottom:3%;border-radius:50%;border:calc(min(calc(100vh - 120px),640px)*0.01) solid rgba(20,85,30,.5)}
+
+/* Coordinates - lichess style */
+.sq .coord{position:absolute;font-size:calc(min(calc(100vh - 120px),640px) * .017);font-weight:700;pointer-events:none;z-index:4;font-family:'Noto Sans',sans-serif}
+.sq .coord-file{bottom:1px;right:3px}
+.sq .coord-rank{top:1px;left:3px}
+.sq.light .coord{color:#b58863}
+.sq.dark .coord{color:#f0d9b5}
+
+/* SIDEBAR - exact lichess */
+.puzzle__side{width:280px;display:flex;flex-direction:column;background:#262421}
+
+/* Move list */
+.puzzle__moves{flex:1;overflow-y:auto;padding:0}
+.puzzle__moves table{width:100%;border-collapse:collapse}
+.puzzle__moves td{padding:5px 8px;font-size:15px;font-family:'Noto Sans',sans-serif}
+.puzzle__moves .index{color:#666;width:28px;text-align:right;padding-right:4px}
+.puzzle__moves .move{color:#bababa;cursor:pointer;border-radius:2px}
+.puzzle__moves .move:hover{background:rgba(255,255,255,.07)}
+.puzzle__moves .move.active{background:#3692e7;color:#fff}
+
+/* Prompt area */
+.puzzle__feedback{padding:24px 20px;text-align:center}
+.puzzle__feedback .icon{margin-bottom:8px}
+.puzzle__feedback .icon img{width:52px;height:52px;opacity:.7}
+.puzzle__feedback .result{font-size:22px;font-weight:700;color:#ccc;margin-bottom:2px}
+.puzzle__feedback .instruction{font-size:15px;color:#999;margin-bottom:16px}
+.puzzle__feedback .actions{display:flex;flex-direction:column;gap:0}
+.puzzle__feedback .actions a{display:block;padding:12px;text-align:center;color:#3692e7;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;text-decoration:none;border:none;background:none}
+.puzzle__feedback .actions a:hover{background:rgba(54,146,231,.08)}
+.puzzle__feedback.success .result{color:#629924}
+.puzzle__feedback.failure .result{color:#cc3333}
+.puzzle__feedback.retry .result{color:#cc3333}
+
+/* Continue button */
+.puzzle__feedback .continue-btn{display:block;padding:14px;text-align:center;background:#629924;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:3px;cursor:pointer;margin:8px 16px;text-transform:uppercase}
+.puzzle__feedback .continue-btn:hover{background:#72b328}
+
+/* Bottom bar */
+.puzzle__info{padding:12px 16px;border-top:1px solid #333;display:flex;align-items:center;justify-content:space-between}
+.puzzle__info .details{font-size:13px;color:#999}
+.puzzle__info .details a{color:#3692e7;text-decoration:none}
+.puzzle__info .details a:hover{text-decoration:underline}
+.puzzle__info .details b{color:#ccc}
+.puzzle__info .nav-arrows{display:flex;gap:3px}
+.puzzle__info .nav-arrows button{width:34px;height:34px;background:#302e2b;border:none;color:#999;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:serif}
+.puzzle__info .nav-arrows button:hover{background:#3a3835;color:#fff}
+
+/* PLAY VIEW */
+.play-page{max-width:840px;margin:0 auto;padding:20px 12px}
+.play-ctrls{display:flex;gap:12px;align-items:flex-end;margin-bottom:16px}
+.play-ctrls .fg{flex:1}
+.play-ctrls label{display:block;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-weight:600}
+.play-ctrls select{width:100%;padding:8px;background:#302e2b;color:#bababa;border:1px solid #3a3632;border-radius:3px;font-size:14px;font-family:'Noto Sans',sans-serif}
+.play-btn{padding:10px 24px;background:#629924;color:#fff;border:none;border-radius:3px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans',sans-serif}
+.play-btn:hover{background:#72b328}
+.g-status{text-align:center;padding:12px;font-size:16px;font-weight:600;color:#ccc;background:#262421;border-radius:4px;margin-bottom:12px}
+.g-board-wrap{display:flex;justify-content:center}
+.g-board{width:min(calc(100vh - 200px),520px);aspect-ratio:1;display:grid;grid-template-columns:repeat(8,12.5%);grid-template-rows:repeat(8,12.5%);border-radius:4px;overflow:hidden;user-select:none}
+.g-moves{margin-top:12px;padding:12px;background:#262421;border-radius:4px;font-family:monospace;font-size:13px;color:#999;min-height:50px;max-height:120px;overflow-y:auto;line-height:1.8}
+
+/* STATS VIEW */
+.stats-page{max-width:500px;margin:0 auto;padding:30px 12px}
+.stats-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:20px;text-align:center}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-card{padding:24px;background:#262421;border-radius:4px;text-align:center}
+.stat-card .num{font-size:36px;font-weight:800;color:#629924}
+.stat-card .lbl{font-size:12px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* Promo modal */
+.promo-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
+.promo-choices{display:flex;gap:4px;background:#302e2b;padding:12px;border-radius:6px;border:2px solid #629924}
+.promo-choice{width:64px;height:64px;cursor:pointer;border-radius:4px;background-size:cover;border:1px solid #3a3632}
+.promo-choice:hover{border-color:#629924;transform:scale(1.08)}
+
+.hidden{display:none!important}
+
+@media(max-width:768px){
+  .puzzle{flex-direction:column;align-items:center}
+  .puzzle__board .cg-wrap{width:min(96vw,500px)}
+  .puzzle__side{width:min(96vw,500px)}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<header id="top">
+  <div class="site-title">
+    <span style="font-size:26px;color:#b3b3b3">&#9822;</span>
+    <span>Super Grand Master</span>
+  </div>
+  <div class="site-buttons">
+    <a class="active" onclick="switchView('puzzles')">PUZZLES</a>
+    <a onclick="switchView('play')">PLAY</a>
+    <a onclick="switchView('stats')">STATS</a>
+  </div>
+</header>
+
+<!-- PUZZLE VIEW -->
+<div class="puzzle" id="v-puzzles">
+  <div class="puzzle__board">
+    <div class="cg-wrap" id="pboard"></div>
+  </div>
+  <div class="puzzle__side">
+    <div class="puzzle__moves" id="movesList"></div>
+    <div class="puzzle__feedback" id="prompt"></div>
+    <div class="puzzle__info">
+      <div class="details">
+        Puzzle <a id="pzLink" href="#" target="_blank">#—</a><br>
+        Rating: <b id="pzRat">—</b>
+      </div>
+      <div class="nav-arrows">
+        <button onclick="newPuzzle()" title="Previous">&#9664;&#9664;</button>
+        <button onclick="newPuzzle()" title="Back">&#9664;</button>
+        <button onclick="newPuzzle()" title="Next">&#9654;</button>
+        <button onclick="newPuzzle()" title="Last">&#9654;&#9654;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAY VIEW -->
+<div class="play-page hidden" id="v-play">
+  <div class="play-ctrls">
+    <div class="fg"><label>Color</label><select id="gcol"><option value="w">White</option><option value="b">Black</option></select></div>
+    <div class="fg"><label>Level</label><select id="glvl"><option value="1">Beginner</option><option value="2" selected>Intermediate</option><option value="3">Advanced</option><option value="4">Expert</option></select></div>
+    <button class="play-btn" onclick="newGame()">New Game</button>
+  </div>
+  <div class="g-status" id="gstatus">Click New Game to start</div>
+  <div class="g-board-wrap"><div class="g-board" id="gboard"></div></div>
+  <div class="g-moves" id="gmoves"></div>
+</div>
+
+<!-- STATS VIEW -->
+<div class="stats-page hidden" id="v-stats">
+  <div class="stats-title">Your Progress</div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="num" id="xS">0</div><div class="lbl">Solved</div></div>
+    <div class="stat-card"><div class="num" id="xA">0%</div><div class="lbl">Accuracy</div></div>
+    <div class="stat-card"><div class="num" id="xK">0</div><div class="lbl">Streak</div></div>
+    <div class="stat-card"><div class="num" id="xG">0</div><div class="lbl">Games</div></div>
+  </div>
+</div>
+
+<script>
+const PUZZLES=[["00e63", "r4r1k/pp4pp/1qpp1b2/4p3/N3P3/3Q4/PPP2PPP/3RR1K1 b - - 3 16", "b6d4 d3b3 b7b5 d1d4", 1742, "advantage discoveredAttack middlegame short trappedPiece", "advanced"], ["1Gbdr", "r3k1nr/pp3ppp/2n1p1b1/1Bb5/6P1/4PN1P/PP3P2/RNBK3R w kq - 1 11", "f3e5 e8c8 d1e2 c6e5", 1541, "advantage castling discoveredAttack discoveredCheck middlegame short", "intermediate"], ["0DuX5", "2br2k1/1pq4p/3Np1p1/1PP1Pp2/5Pn1/6P1/4Q1BP/R5K1 w - - 1 28", "c5c6 c7b6 g1h1 g4f2", 1475, "equality middlegame short", "intermediate"], ["00Tdk", "r6r/4kppp/2pNpnq1/p1P1n3/8/B3P3/PP2QPPP/3R1RK1 w - - 7 20", "e2d2 e5f3 g1h1 f3d2", 1029, "crushing middlegame pin short", "beginner"], ["017Ut", "3r3r/pp3pp1/5k2/2pbq3/3N4/Q4PP1/PPP1N2p/R3R2K w - - 1 22", "a3c5 d5f3 d4f3 e5c5", 1150, "advantage discoveredAttack middlegame short", "beginner"], ["01mVv", "1k1r2nr/1p5p/p3Qpb1/4n3/3q4/2BB4/PPP2PPP/R4RK1 b - - 1 20", "d4d7 c3e5 b8a7 e6d7", 1588, "advantage middlegame queensideAttack short", "intermediate"], ["02lt5", "8/8/Q6p/2R3pk/5n2/4pN1b/1r5K/8 w - - 2 57", "h2g3 b2g2", 816, "endgame epauletteMate hookMate mate mateIn1 oneMove operaMate", "beginner"], ["02Uju", "8/1pp2pk1/p4Np1/4P1K1/1Pr5/r1P4R/8/8 b - - 5 41", "a3c3 h3h7 g7f8 h7h8 f8e7 h8e8", 1773, "endgame hookMate long mate mateIn3", "advanced"], ["01iqw", "r3kb1r/1p3pp1/p1p1b3/4p1Bp/4P3/2NQ1PP1/PPP2qBP/R6K b kq - 1 16", "f7f6 g5e3 e6c4 e3f2 c4d3 c2d3", 1734, "advantage long middlegame trappedPiece", "advanced"], ["005wy", "1r6/pp2kpp1/2n1p1n1/3p2PQ/5P2/2PqP3/PP1N4/2KR3R w - - 3 27", "h5h7 c6b4 c3b4 b8c8 d2c4 c8c4", 1988, "long mate mateIn3 middlegame queensideAttack sacrifice", "advanced"], ["0I7Ls", "r7/p2p2bQ/5kp1/qp1bn3/4P3/1B6/PP3PPP/R4RK1 w - - 0 22", "b3d5 a8h8 h7h8 g7h8", 1030, "advantage middlegame short trappedPiece", "beginner"], ["00fxc", "4r2k/1pQ2p2/p4N1p/5P2/1P6/P1Pn1K2/4r3/6R1 w - - 1 36", "c7f7 e8e3 f3g4 d3e5 g4h5 e2h2", 2287, "endgame exposedKing fork long mate mateIn3", "advanced"], ["003eP", "8/r1b1q2k/2p3p1/2Pp4/1P2p1n1/2B1P3/NQ6/2K4R b - - 1 36", "h7g8 h1h8 g8f7 h8h7 f7e8 h7e7", 1156, "crushing exposedKing long middlegame skewer", "beginner"], ["0ARds", "r3n2k/ppp3b1/3p2pp/8/4RB2/1QP2nPq/PP3rB1/RN5K w - - 0 19", "g2h3 f2h2", 970, "arabianMate mate mateIn1 middlegame oneMove", "beginner"], ["002Q2", "7k/p4R1p/3p3r/2pN1n2/2PbBBb1/3P2P1/P3r3/5R1K w - - 1 28", "f4h6 f5g3", 983, "cornerMate mate mateIn1 middlegame oneMove", "beginner"], ["00ZAn", "rnbqk1nr/ppp1b1pp/3p4/4p3/2B1P3/5N2/PPPP2PP/RNBQK2R w KQkq - 0 6", "f3e5 d6e5 d1h5 g7g6 h5e5 g8f6", 1794, "advantage hangingPiece long opening", "advanced"], ["00KhM", "5rk1/5ppp/1R6/3Qp3/2B1P3/2q3P1/3R1PKP/1r6 b - - 0 27", "b1b6 d5f7 f8f7 d2d8", 1335, "clearance endgame mate mateIn2 pin sacrifice short", "intermediate"], ["01ghr", "8/8/5k2/6p1/r2RK1P1/5P2/8/8 b - - 51 68", "a4d4 e4d4 f6e6 d4e4", 1120, "crushing defensiveMove endgame short zugzwang", "beginner"], ["0FL5I", "1r3knr/1P2pp1p/3p2p1/8/Q3P1b1/3q1N2/P2B1PPP/R3K2R w KQ - 4 16", "a4a8 d3e4 d2e3 b8a8 b7a8q e4a8", 2187, "crushing long middlegame xRayAttack", "advanced"], ["0Ct1P", "8/pp3pkp/1q1p1np1/8/2P5/3Br1R1/PPQ3PP/5RK1 w - - 0 27", "f1f6 e3e1", 1156, "discoveredCheck doubleCheck endgame mate mateIn1 oneMove", "beginner"], ["05bKI", "r1b1k2N/pppp2pp/8/2q1p3/2B1n3/5n2/PPP3PP/RNBQ1RK1 w q - 1 11", "g1h1 c5g1 f1g1 e4f2", 1365, "kingsideAttack mate mateIn2 middlegame sacrifice short smotheredMate", "intermediate"], ["073Wk", "r5r1/pp5k/n2p1q1p/2pP1R2/2P5/P1NBp1bP/1P4P1/R5KQ b - - 0 28", "f6d4 f5f7 h7h8 f7h7", 904, "discoveredCheck doubleCheck mate mateIn2 middlegame operaMate short", "beginner"], ["012uN", "8/p2n1k2/5P2/5KPP/2P5/8/n7/8 b - - 1 49", "a2c3 g5g6 f7f8 h5h6", 1929, "crushing endgame knightEndgame short", "advanced"], ["015jf", "2r1r1k1/1p3p1p/p3p1pQ/3b4/7R/1P1P1P2/2P3PP/q3NK1R b - - 4 24", "c8c2 h6h7 g8f8 h7h8 a1h8 h4h8 f8g7 h8e8", 1079, "advantage kingsideAttack middlegame skewer veryLong", "beginner"], ["00Nf5", "r1bq1rk1/pp2bppp/2pp1n2/8/5P2/5N2/PBPPB1PP/RN1Q1RK1 w - - 5 11", "b1c3 d8b6 g1h1 b6b2 a1b1 b2a3", 1664, "advantage fork long opening", "intermediate"], ["01VvX", "5rk1/pp1b1Npp/3p2r1/8/PnN5/8/5RP1/5RK1 b - - 1 26", "d7a4 f7h6 g7h6 f2f8 g8g7 f1f7", 1125, "blindSwineMate discoveredAttack long mate mateIn3 middlegame", "beginner"], ["09KHF", "1R6/3R2p1/4p1kp/1P3p2/4n2P/4PKP1/r4P2/8 w - - 0 40", "b8b7 a2f2", 922, "endgame epauletteMate hookMate mate mateIn1 oneMove", "beginner"], ["00r2f", "5rk1/pp3rp1/4R2p/b2Q4/3P4/5P1P/PP2R1Bq/5K2 w - - 7 31", "d5a5 f7f3 f1e1 h2g1 e1d2 g1d4", 1398, "crushing exposedKing long middlegame", "intermediate"], ["00ON5", "8/k1p5/P7/3N4/3P2pp/3K2n1/6P1/8 w - - 1 47", "d3e3 h4h3 e3f2 h3h2 f2g3 h2h1q", 1849, "advancedPawn crushing endgame knightEndgame long promotion", "advanced"], ["01Npb", "8/8/2p3p1/2P2p1b/3Bk2K/4P3/7P/8 w - - 15 41", "h4g5 f5f4 e3f4 e4d4 f4f5 g6f5", 2098, "bishopEndgame crushing deflection endgame long", "advanced"], ["00YhY", "8/8/5kp1/R7/4p1P1/5p1P/2r2P2/6K1 w - - 0 52", "h3h4 c2c1 g1h2 e4e3", 1670, "crushing endgame rookEndgame short", "intermediate"], ["6ijui", "rnb1k2r/pp1pnppp/8/3Pp3/4P3/5N2/P1Q2PPP/q1B1KB1R b Kkq - 1 11", "b8a6 f1a6 b7a6 e1g1", 1574, "advantage castling defensiveMove opening short", "intermediate"], ["0128O", "r4rk1/1q1p2pp/p1b1p3/2p1Q3/8/1B6/PPP2PPP/3RR1K1 b - - 0 21", "c6g2 d1d7 b7d7 b3e6 g8h8 e6d7", 1753, "advantage attraction fork long middlegame sacrifice", "advanced"], ["00KYU", "3r4/p2n2kp/1p2Bpp1/2r2N2/4q3/6QP/P5P1/5R1K b - - 1 40", "g7f8 g3d6 f8e8 d6e7", 1239, "mate mateIn2 middlegame short", "intermediate"], ["009IO", "3rk3/5p1r/p2Np1p1/3bP3/P2n4/8/1P3RPP/5RK1 b - - 4 25", "e8e7 f2f7 h7f7 f1f7", 1163, "hookMate mate mateIn2 middlegame short", "beginner"], ["001om", "5r1k/pp4pp/5p2/1BbQp1r1/6K1/7P/1PP3P1/3R3R w - - 2 26", "g4h4 c5f2 g2g3 f2g3", 1018, "mate mateIn2 middlegame morphysMate short", "beginner"], ["06fMQ", "r3qr2/ppp2pk1/3p1np1/3Pp2p/4P2P/P1Q2P1B/1PP2P2/2KR3R b - - 0 18", "c7c5 d5c6 e8c6 c3c6 b7c6 d1d6", 1460, "advantage capturingDefender enPassant long middlegame", "intermediate"], ["00ybx", "6k1/p7/2p1r1bp/3p2p1/8/1PP3BP/P4P2/3R1K2 w - - 0 35", "d1e1 g6d3 f1g2 e6e1", 961, "crushing deflection endgame master short", "beginner"], ["01aXt", "2rqr3/7k/1pb1p1pp/p2pPp2/2pP1B1P/P1P2NQ1/1P1R1PP1/6K1 b - - 0 38", "h7g7 h4h5 g6g5 f3g5 e8g8 g5e6", 1975, "advantage discoveredCheck doubleCheck long middlegame pin", "advanced"], ["01z4c", "3QN1k1/1p3pb1/2r1p1p1/3pP3/3P3p/1B5P/PP3KP1/2r2n2 b - - 5 31", "c6c8 e8f6", 1245, "doubleCheck master mate mateIn1 middlegame oneMove", "intermediate"], ["01xk5", "r3k2r/pp1n1pp1/4p3/3pPnPp/2pP1Q1P/2B2N2/qPPK1P2/3R3R b kq - 5 19", "g7g6 d1a1 a2a1 h1a1", 1077, "advantage middlegame short trappedPiece", "beginner"], ["01wap", "8/5p2/4k3/6p1/3KP1P1/8/8/8 w - - 5 56", "d4d3 e6e5 d3e3 f7f6 e3f3 e5d4", 1445, "crushing endgame long master pawnEndgame quietMove zugzwang", "intermediate"], ["02fPe", "1R6/5pkp/4pNp1/P3P1P1/8/4rn2/1P6/2K5 b - - 2 33", "e3e5 b8g8", 898, "endgame epauletteMate hookMate mate mateIn1 oneMove", "beginner"], ["03cd7", "3r1rk1/1p1qbpp1/p2ppn1p/4P3/1n5B/2N2N2/PPPQ1PPP/1K1R3R b - - 0 15", "d6e5 d2d7 d8d7 d1d7 f6d7 h4e7", 1880, "capturingDefender crushing long middlegame", "advanced"], ["055lF", "4rrk1/1p1n2p1/p2p2p1/3P1q2/1PP1p3/5N1P/P2Q1PP1/R3R1K1 w - - 0 21", "f3g5 e4e3 e1e3 f5g5", 1634, "advantage interference middlegame short", "intermediate"], ["2ikSU", "r1b2r1k/1p1pNppB/n1p5/q7/P7/4PQ2/2P1KPPP/R6R b - - 0 18", "h8h7 f3h3 a5h5 h3h5", 1770, "anastasiaMate mate mateIn2 middlegame short", "advanced"], ["00WJN", "5Q2/7K/8/8/4p2P/3kq3/8/8 b - - 1 53", "e3g3 f8a3 d3d2 a3g3", 1324, "crushing endgame queenEndgame short skewer", "intermediate"], ["04sGR", "r1b4r/1p1p1pp1/p1n1kb1p/4pN2/2P1P3/5N2/PP3PPP/2KR1B1R b - - 0 14", "g7g6 d1d6", 1072, "hookMate mate mateIn1 middlegame oneMove", "beginner"], ["01jhf", "2kr2nr/ppp2ppp/3pb3/q3n3/7Q/PBNPB2P/1PP3P1/R4K1R b - - 2 15", "e5d3 b3e6 f7e6 c2d3", 1644, "advantage intermezzo middlegame short", "intermediate"], ["03HYt", "3k4/3r4/6R1/4R2p/1p2P2P/pP1bPK2/r4NP1/8 w - - 0 42", "e5h5 d3e2 f3g3 e2h5", 1803, "advantage endgame master short skewer", "advanced"], ["02LuE", "8/p2Q4/5kp1/2P4p/7P/1q4PK/8/8 w - - 2 60", "c5c6 b3e6 d7e6 f6e6 c6c7 e6d7 c7c8q d7c8", 1026, "crushing endgame queenEndgame veryLong", "beginner"], ["00Bul", "rnbqk2r/pp3ppp/5n2/3pN3/2B5/2P5/P1PPQPPP/R1B1K2R b KQkq - 1 8", "d5c4 e5c6 c8e6 c6d8", 1284, "advantage discoveredAttack discoveredCheck opening short", "intermediate"], ["03P5r", "8/5Pk1/p2q4/1p2pQ1P/2p5/7K/1P3P2/8 w - - 0 48", "f5g6 d6g6 h5g6 b5b4 f7f8q g7f8", 1718, "crushing endgame long queenEndgame quietMove", "advanced"], ["08vK0", "7r/3R4/2p2Pp1/4pkPp/2N1N3/2P1KP2/r5nP/7R w - - 4 34", "e3d3 g2f4 d3e3 a2e2", 1050, "hookMate mate mateIn2 middlegame short", "beginner"], ["000lC", "3r3r/pQNk1ppp/1qnb1n2/1B6/8/8/PPP3PP/3R1R1K w - - 5 19", "d1d6 d7d6 b7b6 a7b6", 1437, "advantage hangingPiece middlegame short", "intermediate"], ["00slx", "8/6r1/3kpRp1/6Pp/3K1P1P/8/8/8 b - - 0 61", "d6e7 d4e5 g7g8 f6e6 e7f7 f4f5", 2001, "crushing endgame long rookEndgame", "advanced"], ["0O3Ty", "2q5/7k/6p1/5p2/3Qp3/1P5P/4N1P1/7K w - - 6 51", "e2f4 c8c1 d4g1 c1f4", 1222, "endgame equality fork short", "intermediate"], ["02242", "r4rk1/1p3pp1/8/2p1pNP1/4PnR1/P7/1B3q1N/3R3K b - - 1 32", "f2b2 f5e7 g8h7 g4h4 f4h5 h4h5", 1019, "anastasiaMate long mate mateIn3 middlegame", "beginner"], ["00km1", "1R3rk1/p2q1ppp/3bpn2/3p4/Q2P4/2N3P1/P3PP1P/2B2RK1 b - - 0 17", "d7a4 b8f8 g8f8 c3a4", 1398, "crushing intermezzo middlegame short", "intermediate"], ["1zsRQ", "r3qbk1/ppp2Rp1/2npp2p/6NQ/4N3/3P4/PPP3PP/6K1 b - - 1 17", "c6e5 h5h6 e5f3 g2f3 g7h6 e4f6 g8h8 f7h7", 2272, "arabianMate fork mate mateIn4 middlegame sacrifice veryLong", "advanced"]];
+const PIECE_SVG={"wK": "https://lichess1.org/assets/hashed/wK.6a015951.svg", "wQ": "https://lichess1.org/assets/hashed/wQ.c3dc7fce.svg", "wR": "https://lichess1.org/assets/hashed/wR.53013fc8.svg", "wB": "https://lichess1.org/assets/hashed/wB.b7d1a118.svg", "wN": "https://lichess1.org/assets/hashed/wN.ef4cde0a.svg", "wP": "https://lichess1.org/assets/hashed/wP.0596b7ce.svg", "bK": "https://lichess1.org/assets/hashed/bK.b83f0a15.svg", "bQ": "https://lichess1.org/assets/hashed/bQ.b60573d7.svg", "bR": "https://lichess1.org/assets/hashed/bR.7b4fa825.svg", "bB": "https://lichess1.org/assets/hashed/bB.ede0f498.svg", "bN": "https://lichess1.org/assets/hashed/bN.28c70309.svg", "bP": "https://lichess1.org/assets/hashed/bP.09539f32.svg"};
+
+// Map chess.js piece to SVG key
+function pieceKey(p){return (p.color==='w'?'w':'b')+p.type.toUpperCase()}
+
+let view='puzzles',chess=null,sel=null,lastMv=null,flipped=false;
+let curPz=null,pzIdx=0,pzDone=false;
+let gChess=null,pCol='w',eLvl=2,gOn=false;
+let st=JSON.parse(localStorage.getItem('sgm3')||'{"s":0,"a":0,"k":0,"g":0,"w":0}');
+
+function switchView(v){
+  view=v;
+  document.querySelectorAll('.site-buttons a').forEach(a=>{a.classList.toggle('active',a.textContent.toLowerCase()===v)});
+  document.getElementById('v-puzzles').classList.toggle('hidden',v!=='puzzles');
+  document.getElementById('v-play').classList.toggle('hidden',v!=='play');
+  document.getElementById('v-stats').classList.toggle('hidden',v!=='stats');
+  if(v==='stats')updStats();
+}
+
+// === BOARD ===
+function drawBoard(id,ch,fl,canMove,onClick){
+  const el=document.getElementById(id);el.innerHTML='';
+  const b=ch.board();
+  const ksq=ch.in_check()?findKing(ch,ch.turn()):null;
+  for(let r=0;r<8;r++){for(let c=0;c<8;c++){
+    const rr=fl?7-r:r,cc=fl?7-c:c;
+    const f='abcdefgh'[cc],rk=8-rr,sq=f+rk,lt=(rr+cc)%2===0;
+    const d=document.createElement('div');
+    let cls='sq '+(lt?'light':'dark');
+    if(lastMv&&(sq===lastMv.from||sq===lastMv.to))cls+=' lastmove';
+    if(sq===sel)cls+=' selected';
+    if(sq===ksq)cls+=' check';
+    d.className=cls;d.dataset.sq=sq;
+
+    // Coords
+    if(c===7){const s=document.createElement('span');s.className='coord coord-rank';s.textContent=rk;d.appendChild(s)}
+    if(r===7){const s=document.createElement('span');s.className='coord coord-file';s.textContent=f;d.appendChild(s)}
+
+    // Move hints
+    if(sel&&canMove){
+      const mvs=ch.moves({square:sel,verbose:true});
+      const m=mvs.find(x=>x.to===sq);
+      if(m){
+        if(m.captured||b[rr][cc]){const h=document.createElement('div');h.className='capture-ring';d.appendChild(h)}
+        else{const h=document.createElement('div');h.className='move-dot';d.appendChild(h)}
+      }
+    }
+
+    // Piece as background image (Lichess SVGs)
+    const pc=b[rr][cc];
+    if(pc){
+      const img=document.createElement('div');
+      img.className='piece-img';
+      img.style.backgroundImage='url("'+PIECE_SVG[pieceKey(pc)]+'")';
+      d.appendChild(img);
+    }
+
+    if(canMove){d.onclick=()=>onClick(sq);d.ontouchend=(e)=>{e.preventDefault();onClick(sq)}}
+    el.appendChild(d);
+  }}
+}
+function findKing(ch,col){const b=ch.board();for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(p&&p.type==='k'&&p.color===col)return 'abcdefgh'[c]+(8-r)}return null}
+
+// === PUZZLES ===
+function newPuzzle(){
+  const raw=PUZZLES[Math.floor(Math.random()*PUZZLES.length)];
+  const sCh=new Chess(raw[1]);
+  const moves=raw[2].split(' ');
+  const om=moves[0];
+  sCh.move({from:om.slice(0,2),to:om.slice(2,4),promotion:om.length>4?om[4]:undefined});
+  curPz={fen:sCh.fen(),sol:moves.slice(1),color:sCh.turn(),rating:raw[3],themes:raw[4],id:raw[0]};
+  pzIdx=0;pzDone=false;sel=null;
+  chess=new Chess(curPz.fen);
+  flipped=curPz.color==='b';
+  lastMv={from:om.slice(0,2),to:om.slice(2,4)};
+  drawPuzzle();
+  document.getElementById('pzLink').textContent='#'+curPz.id;
+  document.getElementById('pzLink').href='https://lichess.org/training/'+curPz.id;
+  document.getElementById('pzRat').textContent=curPz.rating;
+  showPrompt('turn');
+}
+function drawPuzzle(){drawBoard('pboard',chess,flipped,!pzDone,onPzSq);renderMoves()}
+function onPzSq(sq){
+  if(pzDone)return;
+  if(sel){
+    const mvs=chess.moves({square:sel,verbose:true});
+    const m=mvs.find(x=>x.to===sq);
+    if(m){
+      if(m.flags.includes('p')){showPromo(sel,sq,chess.turn(),'pz');return}
+      doPzMove(sel,sq);
+    }else{const pc=chess.get(sq);sel=(pc&&pc.color===chess.turn())?sq:null;drawPuzzle()}
+  }else{const pc=chess.get(sq);if(pc&&pc.color===chess.turn())sel=sq;drawPuzzle()}
+}
+function doPzMove(fr,to,pr){
+  const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
+  if(uci===exp){
+    chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
+    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');drawPuzzle();return}
+    showPrompt('good');drawPuzzle();
+    setTimeout(()=>{
+      const op=curPz.sol[pzIdx];chess.move({from:op.slice(0,2),to:op.slice(2,4),promotion:op.length>4?op[4]:undefined});
+      lastMv={from:op.slice(0,2),to:op.slice(2,4)};pzIdx++;
+      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success')}
+      else showPrompt('turn');
+      drawPuzzle();
+    },400);
+  }else{st.a++;st.k=0;saveSt();showPrompt('fail');sel=null;drawPuzzle()}
+}
+function showPrompt(type){
+  const el=document.getElementById('prompt');
+  const col=curPz?.color==='w'?'white':'black';
+  const kingSvg=curPz?.color==='w'?PIECE_SVG.wK:PIECE_SVG.bK;
+  if(type==='turn'){
+    el.className='puzzle__feedback';
+    el.innerHTML='<div class="icon"><img src="'+kingSvg+'" alt=""></div><div class="result">Your turn</div><div class="instruction">Find the best move for '+col+'.</div><div class="actions"><a onclick="pzHint()">GET A HINT</a><a onclick="pzSolution()">VIEW THE SOLUTION</a></div>';
+  }else if(type==='good'){
+    el.className='puzzle__feedback success';
+    el.innerHTML='<div class="result">\u2713 Best move!</div><div class="instruction">Keep going...</div>';
+  }else if(type==='success'){
+    el.className='puzzle__feedback success';
+    el.innerHTML='<div class="result">\u2713 Puzzle complete!</div><button class="continue-btn" onclick="newPuzzle()">CONTINUE \u2192</button>';
+  }else if(type==='fail'){
+    el.className='puzzle__feedback retry';
+    el.innerHTML='<div class="result">\u2717 That\'s not it</div><div class="instruction">Try something else.</div><div class="actions"><a onclick="pzHint()">GET A HINT</a><a onclick="pzSolution()">VIEW THE SOLUTION</a></div>';
+  }
+}
+function pzHint(){if(!curPz||pzDone)return;sel=curPz.sol[pzIdx].slice(0,2);drawPuzzle()}
+function pzSolution(){if(!curPz)return;pzDone=true;let i=pzIdx;(function go(){if(i>=curPz.sol.length){showPrompt('success');return}const m=curPz.sol[i];chess.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m.length>4?m[4]:undefined});lastMv={from:m.slice(0,2),to:m.slice(2,4)};i++;drawPuzzle();setTimeout(go,500)})()}
+function renderMoves(){
+  const el=document.getElementById('movesList');
+  const h=chess.history();
+  let html='<table>';
+  for(let i=0;i<h.length;i+=2){
+    html+='<tr><td class="index">'+(Math.floor(i/2)+1)+'</td><td class="move'+(i===h.length-1?' active':'')+'">'+(h[i]||'')+'</td><td class="move'+(i+1===h.length-1?' active':'')+'">'+(h[i+1]||'')+'</td></tr>';
+  }
+  el.innerHTML=html+'</table>';el.scrollTop=el.scrollHeight;
+}
+
+// === PLAY ===
+const PV={p:100,n:320,b:330,r:500,q:900,k:20000};
+const PST={p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,10,10,10,10,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]};
+function evl(c){const b=c.board();let s=0;for(let r=0;r<8;r++)for(let l=0;l<8;l++){const p=b[r][l];if(!p)continue;const v=PV[p.type]||0;const i=p.color==='w'?r*8+l:(7-r)*8+l;const t=PST[p.type]?PST[p.type][i]:0;s+=p.color==='w'?v+t:-(v+t)}return c.turn()==='w'?s:-s}
+function mmx(c,d,a,b,m){if(d===0||c.game_over()){if(c.in_checkmate())return m?-99999:99999;if(c.in_draw())return 0;return evl(c)}const ms=c.moves({verbose:true}).sort((a,b)=>(b.captured?PV[b.captured]:0)-(a.captured?PV[a.captured]:0));if(m){let v=-Infinity;for(const x of ms){c.move(x);const e=mmx(c,d-1,a,b,false);c.undo();v=Math.max(v,e);a=Math.max(a,e);if(b<=a)break}return v}else{let v=Infinity;for(const x of ms){c.move(x);const e=mmx(c,d-1,a,b,true);c.undo();v=Math.min(v,e);b=Math.min(b,e);if(b<=a)break}return v}}
+function getBest(c,l){const ms=c.moves({verbose:true});if(!ms.length)return null;if(l===1)return ms[Math.floor(Math.random()*ms.length)];const dp=Math.min(l-1,3);let bm=ms[0],bv=-Infinity;for(const m of ms){c.move(m);const v=-mmx(c,dp-1,-Infinity,Infinity,false)+(l<=2?(Math.random()-.5)*100:0);c.undo();if(v>bv){bv=v;bm=m}}return bm}
+
+function newGame(){pCol=document.getElementById('gcol').value;eLvl=parseInt(document.getElementById('glvl').value);gChess=new Chess();gOn=true;sel=null;lastMv=null;drawGame();updGS();if(pCol==='b')setTimeout(engMv,400)}
+function drawGame(){drawBoard('gboard',gChess,pCol==='b',gOn&&gChess.turn()===pCol,onGSq);document.getElementById('gmoves').innerHTML=fmtH()}
+function onGSq(sq){if(!gOn||gChess.turn()!==pCol)return;if(sel){const ms=gChess.moves({square:sel,verbose:true});const m=ms.find(x=>x.to===sq);if(m){if(m.flags.includes('p')){showPromo(sel,sq,gChess.turn(),'g');return}doGMv(sel,sq)}else{const pc=gChess.get(sq);sel=pc&&pc.color===pCol?sq:null;drawGame()}}else{const pc=gChess.get(sq);if(pc&&pc.color===pCol)sel=sq;drawGame()}}
+function doGMv(f,t,p){gChess.move({from:f,to:t,promotion:p});lastMv={from:f,to:t};sel=null;drawGame();updGS();if(gChess.game_over()){endG();return}setTimeout(engMv,300)}
+function engMv(){if(!gOn||gChess.game_over())return;const m=getBest(gChess,eLvl);if(m){gChess.move(m);lastMv={from:m.from,to:m.to};drawGame();updGS();if(gChess.game_over())endG()}}
+function updGS(){const e=document.getElementById('gstatus');if(!gChess)return;if(gChess.in_checkmate())e.textContent=(gChess.turn()==='w'?'Black':'White')+' wins!';else if(gChess.in_draw()||gChess.in_stalemate())e.textContent='Draw!';else if(gChess.in_check())e.textContent=(gChess.turn()===pCol?'You are':'Engine is')+' in check!';else e.textContent=gChess.turn()===pCol?'Your turn':'Engine thinking...'}
+function fmtH(){if(!gChess)return'';const h=gChess.history();let s='';for(let i=0;i<h.length;i+=2)s+=(Math.floor(i/2)+1)+'. '+h[i]+' '+(h[i+1]||'')+' ';return s||'No moves yet'}
+function endG(){gOn=false;st.g++;if(gChess.in_checkmate()&&gChess.turn()!==pCol)st.w++;saveSt();drawGame()}
+
+function showPromo(f,t,col,ctx){const ov=document.createElement('div');ov.className='promo-overlay';const bx=document.createElement('div');bx.className='promo-choices';['q','r','b','n'].forEach(p=>{const o=document.createElement('div');o.className='promo-choice';o.style.backgroundImage='url("'+PIECE_SVG[(col==='w'?'w':'b')+p.toUpperCase()]+'")';o.onclick=()=>{document.body.removeChild(ov);if(ctx==='pz')doPzMove(f,t,p);else doGMv(f,t,p)};bx.appendChild(o)});ov.appendChild(bx);ov.onclick=e=>{if(e.target===ov){document.body.removeChild(ov);sel=null;if(ctx==='pz')drawPuzzle();else drawGame()}};document.body.appendChild(ov)}
+
+function updStats(){const a=st.a>0?Math.round(st.s/st.a*100):0;document.getElementById('xS').textContent=st.s;document.getElementById('xA').textContent=a+'%';document.getElementById('xK').textContent=st.k;document.getElementById('xG').textContent=st.g}
+function saveSt(){localStorage.setItem('sgm3',JSON.stringify(st))}
+
+newPuzzle();
+</script>
+</body>
+</html>
