@@ -11,4 +11,4 @@ jobs:
         with:
           node-version: '20'
       - run: npm install -g firebase-tools
-      - run: firebase deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project super-grand-master
+      - run: firebase deploy --only hosting --site super-grand-master --token "${{ secrets.FIREBASE_TOKEN }}" --project super-grand-master
