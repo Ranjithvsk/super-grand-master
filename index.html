@@ -5743,6 +5743,24 @@ function newPuzzle(){
   showPrompt('turn');
 }
 function drawPuzzle() {
+  /* BUG1-FIX: reset panel to Your-turn state on every new puzzle */
+  (function(){
+    var _pr = document.getElementById('prompt');
+    var _ml = document.getElementById('movesList');
+    if (_pr) {
+      var _col = (typeof curPz !== 'undefined' && curPz && curPz.color === 'b') ? 'black' : 'white';
+      _pr.className = 'puzzle__feedback';
+      _pr.innerHTML =
+        '<div class="pz-icon">&#9812;</div>' +
+        '<p class="pz-turn">Your turn</p>' +
+        '<p class="pz-sub">Find the best move for ' + _col + '.</p>' +
+        '<a class="pz-hint" onclick="pzHint()">GET A HINT</a>' +
+        '<a class="pz-sol"  onclick="pzSolution()">VIEW THE SOLUTION</a>';
+    }
+    if (_ml) { _ml.innerHTML = ''; }
+  })();
+  /* BUG1-FIX end */
+
   renderMoves();
   const check = getCheckSq(chess);
   const playerColor = curPz?.color === 'w' ? 'white' : 'black';
@@ -5992,7 +6010,7 @@ if (window._cgReady) {
 </div>
 <div id="user-badge">
   <div class="av" id="uav"><span id="uini">U</span></div>
-  <span class="uname" id="uname"></span>
+  <span class="uname" id="uname"></span><span id="nav-rating" style="font-size:11px;color:#9bc257;margin-left:6px;font-weight:600;display:none;vertical-align:middle"></span>
   <span class="abadge" id="abadge" style="display:none">Admin</span>
   <button id="btn-out">Sign out</button>
 </div>
@@ -6083,11 +6101,13 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776523975 -->
+<!-- sgm:1776525550 -->
 
 <script id="fst-engine">
 (function(){
 var T=["advancedPawn","advantage","anastasiaMate","arabianMate","attackingF2F7","attraction","backRankMate","balestraMate","bishopEndgame","blindSwineMate","capturingDefender","clearance","collinearMove","cornerMate","crushing","defensiveMove","deflection","discoveredAttack","discoveredCheck","doubleBishopMate","doubleCheck","dovetailMate","enPassant","endgame","epauletteMate","equality","exposedKing","fork","hangingPiece","hookMate","interference","intermezzo","killBoxMate","kingsideAttack","knightEndgame","long","master","masterVsMaster","mate","mateIn1","mateIn2","mateIn3","mateIn4","mateIn5","middlegame","morphysMate","oneMove","opening","operaMate","pawnEndgame","pillsburysMate","pin","promotion","queenEndgame","queenRookEndgame","queensideAttack","quietMove","rookEndgame","sacrifice","short","skewer","smotheredMate","swallowstailMate","trappedPiece","triangleMate","veryLong","vukovicMate","xRayAttack","zugzwang"];
+window.FST_THEMES=T;/* BUG2-FIX */
+
 window.FST={db:null,pool:[],ready:false,fetching:false};
 
 function dec(p){
@@ -6163,6 +6183,37 @@ window.addEventListener('load',function(){
     }catch(e){console.warn('[FST] init:',e.message);}
   },1000);
 });
+})();
+</script>
+<script>
+/* BUG3-FIX: populate nav Glicko rating badge */
+(function(){
+  function _setNR(t){
+    var e=document.getElementById('nav-rating');
+    if(e&&t){e.textContent=t;e.style.display='inline';}
+  }
+  /* Poll lb-your-rating (set when leaderboard tab opens) */
+  var _p=setInterval(function(){
+    var yr=document.getElementById('lb-your-rating');
+    if(yr&&yr.textContent.trim()){_setNR(yr.textContent.trim());clearInterval(_p);}
+  },800);
+  /* Also read directly from RTDB after auth */
+  var _a=setInterval(function(){
+    if(typeof firebase==='undefined'||!firebase.auth){return;}
+    clearInterval(_a);
+    firebase.auth().onAuthStateChanged(function(u){
+      if(!u)return;
+      var ref=firebase.database&&firebase.database().ref('users/'+u.uid+'/glicko');
+      if(!ref)return;
+      ref.once('value').then(function(s){
+        var g=s.val();
+        if(g&&g.rating){
+          var prov=(Math.round(g.rd||0)>110)?'?':'';
+          _setNR(Math.round(g.rating)+prov);
+        }
+      }).catch(function(){});
+    });
+  },600);
 })();
 </script>
 </body>
