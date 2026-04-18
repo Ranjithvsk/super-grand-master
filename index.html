@@ -239,7 +239,8 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 #nav-elo.prov{color:#888;border-color:#2e2b28}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script></head>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script></head>
 <body>
 
 <!-- TOP NAV -->
@@ -6082,6 +6083,87 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776509915 -->
+<!-- sgm:1776523975 -->
+
+<script id="fst-engine">
+(function(){
+var T=["advancedPawn","advantage","anastasiaMate","arabianMate","attackingF2F7","attraction","backRankMate","balestraMate","bishopEndgame","blindSwineMate","capturingDefender","clearance","collinearMove","cornerMate","crushing","defensiveMove","deflection","discoveredAttack","discoveredCheck","doubleBishopMate","doubleCheck","dovetailMate","enPassant","endgame","epauletteMate","equality","exposedKing","fork","hangingPiece","hookMate","interference","intermezzo","killBoxMate","kingsideAttack","knightEndgame","long","master","masterVsMaster","mate","mateIn1","mateIn2","mateIn3","mateIn4","mateIn5","middlegame","morphysMate","oneMove","opening","operaMate","pawnEndgame","pillsburysMate","pin","promotion","queenEndgame","queenRookEndgame","queensideAttack","quietMove","rookEndgame","sacrifice","short","skewer","smotheredMate","swallowstailMate","trappedPiece","triangleMate","veryLong","vukovicMate","xRayAttack","zugzwang"];
+window.FST={db:null,pool:[],ready:false,fetching:false};
+
+function dec(p){
+  // p = {i, f, m, r, t}
+  // Returns raw array: [id, fen_initial, moves_str, rating, themes]
+  var themes=(p.t||[]).map(function(i){return T[i]||'';}).filter(Boolean).join(' ');
+  return [p.i, p.f+' - 0 1', p.m, p.r, themes];
+}
+
+function fetch_band(rating){
+  if(FST.fetching||!FST.db) return;
+  FST.fetching=true;
+  var band=Math.floor(rating/100)*100;
+  FST.db.collection('puzzle_paths').where('band_lo','==',band).limit(50).get()
+    .then(function(snap){
+      if(!snap.empty){
+        var docs=snap.docs;
+        var data=docs[Math.floor(Math.random()*docs.length)].data();
+        var pzs=(data.puzzles||[]).map(dec);
+        for(var i=pzs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pzs[i];pzs[i]=pzs[j];pzs[j]=t;}
+        pzs.forEach(function(p){FST.pool.push(p);});
+        console.log('[FST] loaded',pzs.length,'puzzles, pool=',FST.pool.length);
+      }
+    })
+    .catch(function(e){console.warn('[FST]',e.message);})
+    .finally(function(){FST.fetching=false;});
+}
+
+function getR(){try{return Math.round(window.myGlicko&&window.myGlicko.rating||1500);}catch(e){return 1500;}}
+
+function installOverride(){
+  if(typeof window.newPuzzle!=='function'){setTimeout(installOverride,300);return;}
+  var _orig=window.newPuzzle;
+  window.newPuzzle=function(){
+    var r=getR();
+    if(FST.pool.length<15) fetch_band(r);
+    if(FST.ready&&FST.pool.length>0){
+      var raw=FST.pool.shift(); // [id, fen_initial, moves_str, rating, themes]
+      try{
+        var ch=new Chess(raw[1]);           // start from initial FEN
+        var moves=raw[2].split(' ');
+        var m0=moves[0];
+        // Play opponent's first move
+        ch.move({from:m0.slice(0,2),to:m0.slice(2,4),promotion:m0[4]||'q'});
+        // Set curPz exactly as newPuzzle() does
+        window.curPz={
+          fen: ch.fen(),
+          sol: moves.slice(1),
+          color: ch.turn(),
+          rating: raw[3],
+          themes: raw[4],
+          id: raw[0]
+        };
+        if(typeof drawPuzzle==='function') drawPuzzle();
+        return;
+      }catch(e){
+        console.warn('[FST] puzzle error:',e.message,'- falling back');
+      }
+    }
+    _orig();
+  };
+  console.log('[FST] override installed');
+}
+
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    try{
+      FST.db=firebase.firestore();
+      FST.ready=true;
+      console.log('[FST] ready');
+      fetch_band(getR());
+      installOverride();
+    }catch(e){console.warn('[FST] init:',e.message);}
+  },1000);
+});
+})();
+</script>
 </body>
 </html>
