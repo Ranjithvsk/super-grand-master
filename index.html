@@ -128,7 +128,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
   .puzzle__side{width:min(96vw,500px)}
 }
 
-#auth-overlay{position:fixed;inset:0;background:#161512;z-index:9999;display:flex;align-items:center;justify-content:center}
+#auth-overlay{position:fixed;inset:0;background:#161512;z-index:9999;display:none;align-items:center;justify-content:center}
 #auth-box{background:#262421;border-radius:8px;padding:40px 36px;width:100%;max-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
 #auth-box .logo{font-size:40px;margin-bottom:8px}
 #auth-box h2{color:#fff;font-size:22px;margin-bottom:4px;font-weight:800}
@@ -555,7 +555,7 @@ newPuzzle();
         }
       });
     } else {
-      ov.style.display='flex';
+      ov.style.setProperty('display','flex','important');
       badge.style.display='none';
     }
   });
