@@ -5652,8 +5652,9 @@ function applyWrongMove() {
   const user = firebase.auth().currentUser;
   if (!user || !curPz) return;
   const result = G2.update(myGlicko, curPz.rating, 200, 0);
-  const delta = result.rating - myGlicko.rating;
-  myGlicko = result;
+  const rawDelta = result.rating - myGlicko.rating;
+  const delta = Math.max(rawDelta, -30); // cap per-move loss at -30
+  myGlicko = { rating: myGlicko.rating + delta, rd: result.rd, vol: result.vol };
   saveGlicko(user.uid);
   updNavElo();
   // Show rating badge
@@ -5668,8 +5669,9 @@ function applyPuzzleResult(solved) {
   const user = firebase.auth().currentUser;
   if (!user || !curPz) return;
   const result = G2.update(myGlicko, curPz.rating, 50, solved ? 1 : 0);
-  const delta = result.rating - myGlicko.rating;
-  myGlicko = result;
+  const rawDelta = result.rating - myGlicko.rating;
+  const delta = solved ? Math.min(rawDelta, 30) : Math.max(rawDelta, -30);
+  myGlicko = { rating: myGlicko.rating + delta, rd: result.rd, vol: result.vol };
   saveGlicko(user.uid);
   updNavElo();
   // Show rating change feedback
@@ -6091,6 +6093,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776504004 -->
+<!-- sgm:1776504415 -->
 </body>
 </html>
