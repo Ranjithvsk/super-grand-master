@@ -5714,11 +5714,13 @@ function drawPuzzle() {
       var _col = (typeof curPz !== 'undefined' && curPz && curPz.color === 'b') ? 'black' : 'white';
       _pr.className = 'puzzle__feedback';
       _pr.innerHTML =
-        '<div class="pz-icon">&#9812;</div>' +
-        '<p class="pz-turn">Your turn</p>' +
-        '<p class="pz-sub">Find the best move for ' + _col + '.</p>' +
-        '<a class="pz-hint" onclick="pzHint()">GET A HINT</a>' +
-        '<a class="pz-sol"  onclick="pzSolution()">VIEW THE SOLUTION</a>';
+        '<div class="icon"><svg viewBox="0 0 40 40" style="width:40px;height:40px;opacity:.6"><text y="32" font-size="36">&#9812;</text></svg></div>' +
+        '<div class="result">Your turn</div>' +
+        '<div class="instruction">Find the best move for ' + _col + '.</div>' +
+        '<div class="actions">' +
+        '<a onclick="pzHint()">GET A HINT</a>' +
+        '<a onclick="pzSolution()">VIEW THE SOLUTION</a>' +
+        '</div>';
     }
     if (_ml) { _ml.innerHTML = ''; }
   })();
@@ -5732,11 +5734,11 @@ function drawPuzzle() {
       var _col = (typeof curPz !== 'undefined' && curPz && curPz.color === 'b') ? 'black' : 'white';
       _pr.className = 'puzzle__feedback';
       _pr.innerHTML =
-        '<div class="pz-icon">&#9812;</div>' +
-        '<p class="pz-turn">Your turn</p>' +
-        '<p class="pz-sub">Find the best move for ' + _col + '.</p>' +
-        '<a class="pz-hint" onclick="pzHint()">GET A HINT</a>' +
-        '<a class="pz-sol"  onclick="pzSolution()">VIEW THE SOLUTION</a>';
+        '<div class="icon">&#9812;</div>' +
+        '<p class="result">Your turn</p>' +
+        '<p class="instruction">Find the best move for ' + _col + '.</p>' +
+        '<a  onclick="pzHint()">GET A HINT</a>' +
+        '<a   onclick="pzSolution()">VIEW THE SOLUTION</a>';
     }
     if (_ml) { _ml.innerHTML = ''; }
   })();
@@ -6082,7 +6084,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776527140 -->
+<!-- sgm:1776527680 -->
 
 <script id="fst-engine">
 (function(){
