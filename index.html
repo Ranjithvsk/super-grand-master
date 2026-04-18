@@ -5646,6 +5646,7 @@ function updNavElo() {
 
 
 function applyPuzzleResult(solved) {
+  if(pzHinted) return; // no rating change after hint used
   if(pzResultSent) return; pzResultSent=true;
   const user = firebase.auth().currentUser;
   if (!user || !curPz) return;
@@ -6073,6 +6074,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776507259 -->
+<!-- sgm:1776508514 -->
 </body>
 </html>
