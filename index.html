@@ -177,6 +177,31 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 .profile-stat .lbl{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
 .profile-sync-note{font-size:12px;color:#629924;text-align:center;margin-bottom:8px}
 .profile-joined{font-size:12px;color:#555;text-align:center}
+
+/* LEADERBOARD */
+.lb-page{max-width:620px;margin:0 auto;padding:24px 12px}
+.lb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.lb-title{font-size:20px;font-weight:800;color:#fff}
+.lb-your{font-size:13px;color:#555}
+.lb-your b{color:#629924}
+.lb-table{width:100%;border-collapse:collapse}
+.lb-table th{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;text-align:left;border-bottom:1px solid #2e2b28;font-weight:600}
+.lb-table td{padding:10px 12px;border-bottom:1px solid #1e1c1a;font-size:14px;color:#bababa;vertical-align:middle}
+.lb-table tr:hover td{background:#1e1c1a}
+.lb-rank{font-weight:800;color:#555;width:36px;text-align:center}
+.gold{color:#d4af37!important}.silver{color:#a8a9ad!important}.bronze{color:#cd7f32!important}
+.lb-av{width:26px;height:26px;border-radius:50%;background:#629924;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;vertical-align:middle;margin-right:8px}
+.lb-av img{width:100%;height:100%;object-fit:cover}
+.lb-name{font-weight:600;color:#ddd}
+.lb-you .lb-name{color:#629924}
+.lb-rating{font-weight:800;color:#fff;text-align:right;font-size:16px}
+.lb-rd{font-size:11px;color:#555;text-align:right}
+.lb-prov{font-size:10px;color:#888;font-style:italic;margin-left:4px}
+.lb-solved{color:#555;font-size:12px;text-align:right}
+.lb-empty{text-align:center;color:#555;padding:40px;font-size:14px}
+/* Your rating badge in nav */
+#nav-elo{font-size:11px;font-weight:700;background:#1a1917;border:1px solid #3a3632;border-radius:10px;padding:2px 7px;color:#629924;cursor:pointer;margin-left:2px}
+#nav-elo.prov{color:#888;border-color:#2e2b28}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script></head>
 <body>
@@ -301,6 +326,20 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
   <div class="g-moves" id="gmoves"></div>
 </div>
 
+
+<!-- LEADERBOARD VIEW -->
+<div class="lb-page hidden" id="v-leaderboard">
+  <div class="lb-head">
+    <div class="lb-title">&#127942; Leaderboard</div>
+    <div class="lb-your">Your rating: <b id="lb-your-rating">—</b></div>
+  </div>
+  <table class="lb-table">
+    <thead><tr>
+      <th>#</th><th>Player</th><th style="text-align:right">Rating</th><th style="text-align:right">Solved</th>
+    </tr></thead>
+    <tbody id="lb-body"><tr><td colspan="4" class="lb-empty">Loading...</td></tr></tbody>
+  </table>
+</div>
 <!-- PROFILE VIEW -->
 <div class="profile-page hidden" id="v-profile">
   <div class="profile-section">
@@ -5350,6 +5389,7 @@ function switchView(v){
   document.getElementById('v-play').classList.toggle('hidden',v!=='play');
   document.getElementById('v-stats').classList.toggle('hidden',v!=='stats');
   document.getElementById('v-profile').classList.toggle('hidden',v!=='profile');
+  if(document.getElementById('v-leaderboard')) document.getElementById('v-leaderboard').classList.toggle('hidden',v!=='leaderboard');
   if(v==='stats')updStats();
   if(v==='profile')updProfile();
 }
@@ -5422,6 +5462,192 @@ function updateFilterCount(){
   const el=document.getElementById('fc-num');
   if(el) el.textContent=pool.length.toLocaleString();
 }
+
+// ── Lichess-style Glicko-2 ─────────────────────────────────
+// Parameters from lichess-org/lila source code
+const G2 = {
+  TAU: 0.5,          // system constant
+  INIT_RATING: 1500,
+  INIT_RD: 500,      // high uncertainty for new players
+  INIT_VOL: 0.09,    // volatility (max 0.1)
+  MIN_RD: 50,        // floor for active players
+  PROV_RD: 110,      // provisional threshold (shows ? on lichess)
+  SCALE: 173.7178,   // Glicko-2 scale factor
+  EPSILON: 0.000001,
+
+  // Convert rating/RD to Glicko-2 internal scale
+  mu: r => (r - 1500) / 173.7178,
+  phi: rd => rd / 173.7178,
+
+  // g(phi) function
+  g: phi => 1 / Math.sqrt(1 + 3 * phi * phi / (Math.PI * Math.PI)),
+
+  // E(mu, mu_j, phi_j) expected score
+  E: (mu, mu_j, phi_j) => {
+    const g = 1 / Math.sqrt(1 + 3 * phi_j * phi_j / (Math.PI * Math.PI));
+    return 1 / (1 + Math.exp(-g * (mu - mu_j)));
+  },
+
+  // Full Glicko-2 update after a single puzzle result
+  // player: {rating, rd, vol}  puzzle: {rating, rd}  score: 1=solved 0=failed
+  update(player, puzzleRating, puzzleRD, score) {
+    const mu  = this.mu(player.rating);
+    const phi = this.phi(Math.max(player.rd, this.MIN_RD));
+    const mu_j  = this.mu(puzzleRating);
+    const phi_j = this.phi(puzzleRD || 50);
+
+    const g_j = this.g(phi_j);
+    const E_j = this.E(mu, mu_j, phi_j);
+
+    // Step 3: compute v (estimated variance)
+    const v = 1 / (g_j * g_j * E_j * (1 - E_j));
+
+    // Step 4: compute delta
+    const delta = v * g_j * (score - E_j);
+
+    // Step 5: update volatility (Illinois algorithm)
+    const a = Math.log(player.vol * player.vol);
+    const A = a;
+    let B;
+    if (delta * delta > phi * phi + v) {
+      B = Math.log(delta * delta - phi * phi - v);
+    } else {
+      let k = 1;
+      while (this._f(a - k * this.TAU, delta, phi, v, a) < 0) k++;
+      B = a - k * this.TAU;
+    }
+    let fA = this._f(A, delta, phi, v, a);
+    let fB = this._f(B, delta, phi, v, a);
+    let C, fC;
+    for (let i = 0; i < 100; i++) {
+      C = A + (A - B) * fA / (fB - fA);
+      fC = this._f(C, delta, phi, v, a);
+      if (fB * fC < 0) { A = B; fA = fB; }
+      else { fA /= 2; }
+      B = C; fB = fC;
+      if (Math.abs(B - A) < this.EPSILON) break;
+    }
+    const newVol = Math.exp(C / 2);
+
+    // Step 6: update RD
+    const phi_star = Math.sqrt(phi * phi + newVol * newVol);
+
+    // Step 7: new rating and RD
+    const phi_new = 1 / Math.sqrt(1 / (phi_star * phi_star) + 1 / v);
+    const mu_new  = mu + phi_new * phi_new * g_j * (score - E_j);
+
+    return {
+      rating: Math.round(mu_new * this.SCALE + 1500),
+      rd:     Math.max(Math.round(phi_new * this.SCALE), this.MIN_RD),
+      vol:    Math.min(newVol, 0.1)
+    };
+  },
+
+  _f(x, delta, phi, v, a) {
+    const ex = Math.exp(x);
+    const d2 = delta * delta;
+    const p2 = phi * phi;
+    return (ex * (d2 - p2 - v - ex)) /
+           (2 * Math.pow(p2 + v + ex, 2)) - (x - a) / (this.TAU * this.TAU);
+  },
+
+  // Format for display: "1543?" if provisional, "1543" if established
+  display(rating, rd) {
+    return Math.round(rating) + (rd > this.PROV_RD ? '?' : '');
+  }
+};
+
+// ── Player Glicko state (loaded from Firebase on login) ───
+let myGlicko = { rating: G2.INIT_RATING, rd: G2.INIT_RD, vol: G2.INIT_VOL };
+
+function loadGlicko(uid) {
+  firebase.database().ref('users/' + uid + '/glicko').once('value').then(snap => {
+    const d = snap.val();
+    if (d) { myGlicko = { rating: d.r || G2.INIT_RATING, rd: d.rd || G2.INIT_RD, vol: d.vol || G2.INIT_VOL }; }
+    updNavElo();
+  });
+}
+
+function saveGlicko(uid) {
+  firebase.database().ref('users/' + uid + '/glicko').set({
+    r: myGlicko.rating, rd: myGlicko.rd, vol: myGlicko.vol, updated: new Date().toISOString()
+  });
+}
+
+function updNavElo() {
+  const el = document.getElementById('nav-elo');
+  if (!el) return;
+  el.textContent = G2.display(myGlicko.rating, myGlicko.rd);
+  el.className = 'lb-elo' + (myGlicko.rd > G2.PROV_RD ? ' prov' : '');
+  el.title = 'Puzzle rating (RD: ' + Math.round(myGlicko.rd) + ')';
+}
+
+function applyPuzzleResult(solved) {
+  const user = firebase.auth().currentUser;
+  if (!user || !curPz) return;
+  const result = G2.update(myGlicko, curPz.rating, 50, solved ? 1 : 0);
+  const delta = result.rating - myGlicko.rating;
+  myGlicko = result;
+  saveGlicko(user.uid);
+  updNavElo();
+  // Show rating change feedback
+  const sign = delta >= 0 ? '+' : '';
+  const badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;bottom:80px;right:20px;background:#262421;border:1px solid ' +
+    (delta >= 0 ? '#629924' : '#cc3333') + ';color:' + (delta >= 0 ? '#629924' : '#cc3333') +
+    ';padding:8px 14px;border-radius:6px;font-weight:800;font-size:16px;z-index:999;transition:opacity 1s';
+  badge.textContent = sign + delta + ' (' + G2.display(myGlicko.rating, myGlicko.rd) + ')';
+  document.body.appendChild(badge);
+  setTimeout(() => { badge.style.opacity = '0'; setTimeout(() => badge.remove(), 1000); }, 2000);
+}
+
+// ── Leaderboard ───────────────────────────────────────────
+function updLeaderboard() {
+  const tbody = document.getElementById('lb-body');
+  const yourEl = document.getElementById('lb-your-rating');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">Loading...</td></tr>';
+  const user = firebase.auth().currentUser;
+  if (yourEl && user) yourEl.textContent = G2.display(myGlicko.rating, myGlicko.rd);
+  firebase.database().ref('users').once('value').then(snap => {
+    const users = [];
+    snap.forEach(child => {
+      const d = child.val();
+      if (!d || !d.glicko) return;
+      users.push({
+        uid: child.key,
+        name: d.name || d.email?.split('@')[0] || '?',
+        photo: d.photoURL || null,
+        rating: d.glicko.r || G2.INIT_RATING,
+        rd: d.glicko.rd || G2.INIT_RD,
+        solved: d.stats?.s || 0
+      });
+    });
+    users.sort((a, b) => b.rating - a.rating);
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">No ranked players yet. Solve puzzles to get rated!</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.slice(0, 50).map((u, i) => {
+      const rank = i + 1;
+      const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+      const isYou = user && u.uid === user.uid;
+      const av = u.photo
+        ? '<div class="lb-av"><img src="' + u.photo + '"></div>'
+        : '<div class="lb-av">' + u.name[0].toUpperCase() + '</div>';
+      return '<tr class="' + (isYou ? 'lb-you' : '') + '">' +
+        '<td class="lb-rank ' + rankClass + '">' + (rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank) + '</td>' +
+        '<td>' + av + '<span class="lb-name">' + u.name + (isYou ? ' (you)' : '') + '</span></td>' +
+        '<td class="lb-rating">' + G2.display(u.rating, u.rd) +
+          (u.rd > G2.PROV_RD ? '' : '') + '<div class="lb-rd">RD ' + Math.round(u.rd) + '</div></td>' +
+        '<td class="lb-solved">' + (u.solved || 0) + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(() => {
+    tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">Could not load leaderboard.</td></tr>';
+  });
+}
+
 function newPuzzle(){
   const pool=getFilteredPuzzles();
   const raw=pool[Math.floor(Math.random()*pool.length)];
@@ -5456,16 +5682,16 @@ function doPzMove(fr,to,pr){
   const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
   if(uci===exp){
     chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
-    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');drawPuzzle();return}
+    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();applyPuzzleResult(true);showPrompt('success');drawPuzzle();return}
     showPrompt('good');drawPuzzle();
     setTimeout(()=>{
       const op=curPz.sol[pzIdx];chess.move({from:op.slice(0,2),to:op.slice(2,4),promotion:op.length>4?op[4]:undefined});
       lastMv={from:op.slice(0,2),to:op.slice(2,4)};pzIdx++;
-      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success')}
+      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();applyPuzzleResult(true);showPrompt('success')}
       else showPrompt('turn');
       drawPuzzle();
     },400);
-  }else{st.a++;st.k=0;saveSt();showPrompt('fail');sel=null;drawPuzzle()}
+  }else{st.a++;st.k=0;saveSt();applyPuzzleResult(false);showPrompt('fail');sel=null;drawPuzzle()}
 }
 function showPrompt(type){
   const el=document.getElementById('prompt');
