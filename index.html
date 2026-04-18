@@ -5624,7 +5624,7 @@ const G2 = {
 let myGlicko = { rating: G2.INIT_RATING, rd: G2.INIT_RD, vol: G2.INIT_VOL };
 
 function loadGlicko(uid) {
-  firebase.database().ref('users/' + uid + '/glicko').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap => {
+  firebase.database().ref('users/' + uid + '/glicko').once('value').then(snap => {
     const d = snap.val();
     if (d) { myGlicko = { rating: d.r || G2.INIT_RATING, rd: d.rd || G2.INIT_RD, vol: d.vol || G2.INIT_VOL }; }
     updNavElo();
@@ -5672,7 +5672,7 @@ function updLeaderboard() {
   tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">Loading...</td></tr>';
   const user = firebase.auth().currentUser;
   if (yourEl && user) yourEl.textContent = G2.display(myGlicko.rating, myGlicko.rd);
-  firebase.database().ref('users').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap => {
+  firebase.database().ref('users').once('value').then(snap => {
     const users = [];
     snap.forEach(child => {
       const d = child.val();
@@ -5895,7 +5895,7 @@ function updProfile(){
   roleEl.className='profile-role '+(isAdmin?'admin':'user');
   if(u.photoURL){document.getElementById('pav').innerHTML='<img src="'+u.photoURL+'" alt="avatar"/>';}
   // Load stats from Firebase
-  firebase.database().ref('users/'+u.uid+'/stats').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
+  firebase.database().ref('users/'+u.uid+'/stats').once('value').then(snap=>{
     const d=snap.val();
     if(d){
       // Merge Firebase stats with local (take max of each)
@@ -5918,10 +5918,10 @@ function updProfile(){
     document.getElementById('psync').textContent='Showing local stats';
   });
   // Load join date
-  firebase.database().ref('users/'+u.uid+'/lastLogin').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
+  firebase.database().ref('users/'+u.uid+'/lastLogin').once('value').then(snap=>{
     const d=snap.val();
     if(d) document.getElementById('pjoined').textContent='Last login: '+new Date(d).toLocaleDateString();
-  });
+  }).catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);});
 }
 
 // Wait for Chessground then start
@@ -5944,7 +5944,7 @@ if (window._cgReady) {
 // Wire filter controls
 ['f-theme','f-diff','f-moves'].forEach(id=>{
   const el=document.getElementById(id);
-  if(el) el.addEventListener('change',()=>{updateFilterCount();if(window.Chessground){newPuzzle();});
+  if(el) el.addEventListener('change',()=>{updateFilterCount();if(window.Chessground){newPuzzle();}});
 });
 </script>
 
@@ -6032,14 +6032,14 @@ if (window._cgReady) {
         lastLogin:new Date().toISOString()
       }).catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);});
       // Load stats from Firebase and merge with local
-      db.ref('users/'+user.uid+'/stats').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
+      db.ref('users/'+user.uid+'/stats').once('value').then(snap=>{
         const d=snap.val();
         if(d){
           st.s=Math.max(st.s,d.s||0);st.a=Math.max(st.a,d.a||0);
           st.k=Math.max(st.k,d.k||0);st.g=Math.max(st.g,d.g||0);
           localStorage.setItem('sgm3',JSON.stringify(st));
         }
-      });
+      }).catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);});
     } else {
       ov.style.setProperty('display','flex','important');
       badge.style.display='none';
@@ -6055,6 +6055,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776498827 -->
+
+<!-- sgm:1776499027 -->
 </body>
 </html>
