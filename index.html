@@ -166,6 +166,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
     <a class="active" onclick="switchView('puzzles')">PUZZLES</a>
     <a onclick="switchView('play')">PLAY</a>
     <a onclick="switchView('stats')">STATS</a>
+    <a onclick="switchView('profile')">PROFILE</a>
   </div>
 </header>
 
@@ -204,6 +205,24 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
   <div class="g-moves" id="gmoves"></div>
 </div>
 
+<!-- PROFILE VIEW -->
+<div class="profile-page hidden" id="v-profile">
+  <div class="profile-section">
+    <div class="profile-avatar" id="pav"><span id="pini">?</span></div>
+    <div class="profile-name" id="pname">—</div>
+    <div class="profile-email" id="pemail">—</div>
+    <span class="profile-role" id="prole">user</span>
+  </div>
+  <div class="profile-stats">
+    <div class="profile-stat"><div class="num" id="ppS">0</div><div class="lbl">Puzzles Solved</div></div>
+    <div class="profile-stat"><div class="num" id="ppA">0%</div><div class="lbl">Accuracy</div></div>
+    <div class="profile-stat"><div class="num" id="ppK">0</div><div class="lbl">Best Streak</div></div>
+    <div class="profile-stat"><div class="num" id="ppG">0</div><div class="lbl">Games Played</div></div>
+  </div>
+  <div class="profile-sync-note" id="psync">Stats synced to cloud ☁</div>
+  <div class="profile-joined" id="pjoined"></div>
+</div>
+
 <!-- STATS VIEW -->
 <div class="stats-page hidden" id="v-stats">
   <div class="stats-title">Your Progress</div>
@@ -233,7 +252,9 @@ function switchView(v){
   document.getElementById('v-puzzles').classList.toggle('hidden',v!=='puzzles');
   document.getElementById('v-play').classList.toggle('hidden',v!=='play');
   document.getElementById('v-stats').classList.toggle('hidden',v!=='stats');
+  document.getElementById('v-profile').classList.toggle('hidden',v!=='profile');
   if(v==='stats')updStats();
+  if(v==='profile')updProfile();
 }
 
 // === BOARD ===
@@ -374,7 +395,54 @@ function endG(){gOn=false;st.g++;if(gChess.in_checkmate()&&gChess.turn()!==pCol)
 function showPromo(f,t,col,ctx){const ov=document.createElement('div');ov.className='promo-overlay';const bx=document.createElement('div');bx.className='promo-choices';['q','r','b','n'].forEach(p=>{const o=document.createElement('div');o.className='promo-choice';o.style.backgroundImage='url("'+PIECE_SVG[(col==='w'?'w':'b')+p.toUpperCase()]+'")';o.onclick=()=>{document.body.removeChild(ov);if(ctx==='pz')doPzMove(f,t,p);else doGMv(f,t,p)};bx.appendChild(o)});ov.appendChild(bx);ov.onclick=e=>{if(e.target===ov){document.body.removeChild(ov);sel=null;if(ctx==='pz')drawPuzzle();else drawGame()}};document.body.appendChild(ov)}
 
 function updStats(){const a=st.a>0?Math.round(st.s/st.a*100):0;document.getElementById('xS').textContent=st.s;document.getElementById('xA').textContent=a+'%';document.getElementById('xK').textContent=st.k;document.getElementById('xG').textContent=st.g}
-function saveSt(){localStorage.setItem('sgm3',JSON.stringify(st))}
+function saveSt(){
+  localStorage.setItem('sgm3',JSON.stringify(st));
+  // Sync to Firebase if logged in
+  try{
+    const u=firebase.auth().currentUser;
+    if(u) firebase.database().ref('users/'+u.uid+'/stats').set({s:st.s,a:st.a,k:st.k,g:st.g,w:st.w,updated:new Date().toISOString()});
+  }catch(e){}
+}
+function updProfile(){
+  const u=firebase.auth().currentUser;
+  if(!u)return;
+  const isAdmin=['ranjith.vsk@gmail.com'].includes(u.email);
+  document.getElementById('pname').textContent=u.displayName||u.email.split('@')[0];
+  document.getElementById('pemail').textContent=u.email;
+  document.getElementById('pini').textContent=(u.displayName||u.email)[0].toUpperCase();
+  const roleEl=document.getElementById('prole');
+  roleEl.textContent=isAdmin?'Admin':'User';
+  roleEl.className='profile-role '+(isAdmin?'admin':'user');
+  if(u.photoURL){document.getElementById('pav').innerHTML='<img src="'+u.photoURL+'" alt="avatar"/>';}
+  // Load stats from Firebase
+  firebase.database().ref('users/'+u.uid+'/stats').once('value').then(snap=>{
+    const d=snap.val();
+    if(d){
+      // Merge Firebase stats with local (take max of each)
+      st.s=Math.max(st.s,d.s||0);st.a=Math.max(st.a,d.a||0);
+      st.k=Math.max(st.k,d.k||0);st.g=Math.max(st.g,d.g||0);
+      localStorage.setItem('sgm3',JSON.stringify(st));
+    }
+    const acc=st.a>0?Math.round(st.s/st.a*100):0;
+    document.getElementById('ppS').textContent=st.s;
+    document.getElementById('ppA').textContent=acc+'%';
+    document.getElementById('ppK').textContent=st.k;
+    document.getElementById('ppG').textContent=st.g;
+    document.getElementById('psync').textContent='Stats synced to cloud ☁';
+  }).catch(()=>{
+    const acc=st.a>0?Math.round(st.s/st.a*100):0;
+    document.getElementById('ppS').textContent=st.s;
+    document.getElementById('ppA').textContent=acc+'%';
+    document.getElementById('ppK').textContent=st.k;
+    document.getElementById('ppG').textContent=st.g;
+    document.getElementById('psync').textContent='Showing local stats';
+  });
+  // Load join date
+  firebase.database().ref('users/'+u.uid+'/lastLogin').once('value').then(snap=>{
+    const d=snap.val();
+    if(d) document.getElementById('pjoined').textContent='Last login: '+new Date(d).toLocaleDateString();
+  });
+}
 
 newPuzzle();
 </script>
@@ -461,6 +529,15 @@ newPuzzle();
         name:user.displayName||user.email.split('@')[0],
         role:isAdmin?'admin':'user',
         lastLogin:new Date().toISOString()
+      });
+      // Load stats from Firebase and merge with local
+      db.ref('users/'+user.uid+'/stats').once('value').then(snap=>{
+        const d=snap.val();
+        if(d){
+          st.s=Math.max(st.s,d.s||0);st.a=Math.max(st.a,d.a||0);
+          st.k=Math.max(st.k,d.k||0);st.g=Math.max(st.g,d.g||0);
+          localStorage.setItem('sgm3',JSON.stringify(st));
+        }
       });
     } else {
       ov.style.display='flex';
