@@ -6082,7 +6082,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776526903 -->
+<!-- sgm:1776527140 -->
 
 <script id="fst-engine">
 (function(){
@@ -6353,6 +6353,87 @@ window.addEventListener('load', function(){
   },600);
 })();
 </script>
+
+<script>
+/* fix_themes: populate all 69 FST_THEMES into theme dropdown */
+(function(){
+  /* camelCase → "Title Case With Spaces" */
+  function fmt(s){
+    return s
+      .replace(/([A-Z])/g,' $1')
+      .replace(/^./,function(c){return c.toUpperCase();})
+      .trim();
+  }
+
+  /* All 69 themes in display order — grouped logically */
+  var ORDERED = [
+    /* Tactics */
+    "fork","pin","skewer","deflection","discoveredAttack","discoveredCheck",
+    "doubleCheck","attraction","clearance","interference","intermezzo",
+    "sacrifice","hangingPiece","trappedPiece","capturingDefender",
+    "xRayAttack","quietMove","defensiveMove","collinearMove","zugzwang",
+    /* Mate patterns */
+    "mateIn1","mateIn2","mateIn3","mateIn4","mateIn5",
+    "mate","backRankMate","smotheredMate","anastasiaMate","arabianMate",
+    "balestraMate","blindSwineMate","cornerMate","doubleBishopMate",
+    "dovetailMate","epauletteMate","hookMate","killBoxMate","morphysMate",
+    "operaMate","pillsburysMate","swallowstailMate","triangleMate","vukovicMate",
+    /* Attack */
+    "exposedKing","kingsideAttack","queensideAttack","attackingF2F7",
+    /* Phase */
+    "opening","middlegame","endgame",
+    /* Endgames */
+    "rookEndgame","queenRookEndgame","queenEndgame","pawnEndgame",
+    "knightEndgame","bishopEndgame",
+    /* Other */
+    "advancedPawn","promotion","enPassant",
+    "long","veryLong","short","oneMove",
+    "crushing","advantage","equality",
+    "master","masterVsMaster"
+  ];
+
+  function buildThemeSelect(){
+    var sel = document.getElementById('theme-select');
+    if(!sel){ console.warn('[themes] select not found'); return; }
+
+    /* Get themes from FST_THEMES global (set by FST engine) or use ORDERED */
+    var themes = (typeof window.FST_THEMES !== 'undefined') ? window.FST_THEMES : ORDERED;
+
+    /* Build ordered list — ORDERED first (if in themes), then any extras */
+    var seen = {};
+    var ordered = [];
+    ORDERED.forEach(function(t){
+      if(themes.indexOf(t) > -1){ ordered.push(t); seen[t]=1; }
+    });
+    themes.forEach(function(t){
+      if(!seen[t]){ ordered.push(t); seen[t]=1; }
+    });
+
+    /* Clear existing options except "All Themes" */
+    while(sel.options.length > 1) sel.remove(1);
+
+    /* Add all 69 */
+    ordered.forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = fmt(t);
+      sel.appendChild(opt);
+    });
+
+    console.log('[themes] populated', sel.options.length - 1, 'themes');
+  }
+
+  /* Run after FST engine has loaded (which exposes FST_THEMES) */
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(buildThemeSelect, 100);
+    });
+  } else {
+    setTimeout(buildThemeSelect, 100);
+  }
+})();
+</script>
+
 
 <script>
 /* fix_themes: populate all 69 FST_THEMES into theme dropdown */
