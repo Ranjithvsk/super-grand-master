@@ -15,6 +15,21 @@ document.dispatchEvent(new Event('chessground-ready'));
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.base.css">
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.brown.css">
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.cburnett.css">
+<style id="lc-pieces">
+cg-board piece{background-size:cover!important;background-repeat:no-repeat!important}
+cg-board piece.pawn.white{background-image:url(https://lichess1.org/assets/hashed/wP.0596b7ce.svg)!important}
+cg-board piece.knight.white{background-image:url(https://lichess1.org/assets/hashed/wN.ef4cde0a.svg)!important}
+cg-board piece.bishop.white{background-image:url(https://lichess1.org/assets/hashed/wB.b7d1a118.svg)!important}
+cg-board piece.rook.white{background-image:url(https://lichess1.org/assets/hashed/wR.53013fc8.svg)!important}
+cg-board piece.queen.white{background-image:url(https://lichess1.org/assets/hashed/wQ.c3dc7fce.svg)!important}
+cg-board piece.king.white{background-image:url(https://lichess1.org/assets/hashed/wK.6a015951.svg)!important}
+cg-board piece.pawn.black{background-image:url(https://lichess1.org/assets/hashed/bP.09539f32.svg)!important}
+cg-board piece.knight.black{background-image:url(https://lichess1.org/assets/hashed/bN.28c70309.svg)!important}
+cg-board piece.bishop.black{background-image:url(https://lichess1.org/assets/hashed/bB.ede0f498.svg)!important}
+cg-board piece.rook.black{background-image:url(https://lichess1.org/assets/hashed/bR.7b4fa825.svg)!important}
+cg-board piece.queen.black{background-image:url(https://lichess1.org/assets/hashed/bQ.b60573d7.svg)!important}
+cg-board piece.king.black{background-image:url(https://lichess1.org/assets/hashed/bK.b83f0a15.svg)!important}
+</style>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -5455,7 +5470,7 @@ function initCG(id, onMove) {
   return window.Chessground(el, {
     coordinates: true,
     animation: { enabled: true, duration: 150 },
-    movable: { free: false, color: undefined, events: { after: onMove } },
+    movable: { free: false, color: undefined, showDests: true, events: { after: onMove } },
     draggable: { enabled: true },
     selectable: { enabled: true },
     highlight: { lastMove: true, check: true }
