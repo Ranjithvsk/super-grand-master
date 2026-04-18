@@ -5943,9 +5943,11 @@ if (window._cgReady) {
 // Wire filter controls
 ['f-theme','f-diff','f-moves'].forEach(id=>{
   const el=document.getElementById(id);
-  if(el) el.addEventListener('change',()=>{updateFilterCount();newPuzzle();});
+  if(el) el.addEventListener('change',()=>{updateFilterCount();if(window.Chessground){newPuzzle();});
 });
-updateFilterCount();
+updateFilterCount();}else{document.addEventListener('cgready',function(){newPuzzle();});
+});
+updateFilterCount();},{once:true});}
 </script>
 
 <div id="auth-overlay">
@@ -6052,6 +6054,7 @@ updateFilterCount();
 
 <!-- sgm-ts:1776495351 -->
 
-<!-- sgm:1776495956 -->
+
+<!-- sgm:1776496545 -->
 </body>
 </html>
