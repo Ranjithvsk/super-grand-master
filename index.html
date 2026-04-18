@@ -6087,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776528033 -->
+<!-- sgm:1776528281 -->
 
 <script id="fst-engine">
 (function(){
@@ -6517,6 +6517,154 @@ window.addEventListener('load', function(){
   } else {
     setTimeout(buildThemeSelect, 100);
   }
+})();
+</script>
+
+
+<script>
+/* fix_theme_filter: wire theme dropdown + FST theme-aware puzzle loading */
+(function(){
+
+  /* ── Theme filter state ─────────────────────────────── */
+  window.FST = window.FST || {};
+  window.FST.themeFilter = '';   // '' = all themes
+
+  /* ── Check if a raw puzzle matches the current theme ── */
+  function matchesTheme(raw, theme){
+    if(!theme) return true;
+    var themes = Array.isArray(raw) ? (raw[4]||'') : (raw.themes||'');
+    return themes.indexOf(theme) > -1;
+  }
+
+  /* ── Patch fstNewPuzzle to respect theme filter ─────── */
+  var _origFstNP = window.newPuzzle;
+  window.newPuzzle = function(){
+    var theme = window.FST.themeFilter || '';
+    if(!theme){
+      /* No filter — use original FST logic */
+      return _origFstNP.apply(this, arguments);
+    }
+
+    /* Theme filter active — find matching puzzle in pool */
+    var pool = window.FST.pool || [];
+    var matchIdx = -1;
+    for(var i=0; i<pool.length; i++){
+      if(matchesTheme(pool[i], theme)){ matchIdx = i; break; }
+    }
+
+    if(matchIdx > -1){
+      /* Found match — splice it out and build curPz */
+      var raw = pool.splice(matchIdx, 1)[0];
+      try {
+        var sCh = new Chess(raw[1]);
+        var moves = raw[2].split(' ');
+        sCh.move({from:moves[0].slice(0,2),to:moves[0].slice(2,4),promotion:moves[0][4]||'q'});
+        window.curPz = {
+          fen:    sCh.fen(),
+          sol:    moves.slice(1),
+          color:  sCh.turn(),
+          rating: raw[3],
+          themes: raw[4]||'',
+          id:     raw[0]
+        };
+        window._pzShowingSolution = false;
+        window.drawPuzzle();
+        /* Update puzzle info panel */
+        var idEl = document.querySelector('a[href*="lichess.org/training"]');
+        if(idEl){ idEl.href='https://lichess.org/training/'+window.curPz.id; idEl.textContent='#'+window.curPz.id; }
+        var rEls = document.querySelectorAll('.puzzle__info *');
+        rEls.forEach(function(el){
+          if(el.children.length===0 && el.textContent.trim().match(/^\d{3,4}$/)){
+            el.textContent = window.curPz.rating;
+          }
+        });
+        /* Refill pool if running low */
+        if(pool.length < 15) _fetchThemeBand(theme, window.FST.db || firebase.firestore());
+      } catch(e){ console.warn('[FST theme] buildCurPz error:',e.message); _origFstNP(); }
+    } else {
+      /* No match in pool — fetch fresh band and retry after load */
+      console.log('[FST theme] pool empty for theme:', theme, '— fetching...');
+      _fetchThemeBand(theme, window.FST.db || firebase.firestore());
+      /* Show loading state */
+      var pr = document.getElementById('prompt');
+      if(pr){ pr.innerHTML = '<div class="result">Loading ' + theme + ' puzzles...</div>'; }
+      /* Retry after fetch completes */
+      var attempts = 0;
+      var wait = setInterval(function(){
+        attempts++;
+        var matchFound = (window.FST.pool||[]).some(function(p){ return matchesTheme(p,theme); });
+        if(matchFound || attempts > 25){
+          clearInterval(wait);
+          if(matchFound) window.newPuzzle();
+          else {
+            /* Truly no puzzles for this theme in this band — try original */
+            console.warn('[FST theme] no',theme,'puzzles found after fetch');
+            _origFstNP();
+          }
+        }
+      }, 200);
+    }
+  };
+
+  /* ── Fetch Firestore band filtered toward a theme ────── */
+  function _fetchThemeBand(theme, db){
+    if(window.FST.fetching) return;
+    window.FST.fetching = true;
+    var rating = 1500;
+    try {
+      if(window.myGlicko && window.myGlicko.rating) rating = Math.round(window.myGlicko.rating);
+    } catch(e){}
+    var band_lo = Math.floor(Math.max(300,Math.min(3200,rating))/100)*100;
+
+    /* Fetch 3 random chunks to maximise chance of hitting the theme */
+    var fetched = 0, needed = 3;
+    for(var n=0; n<needed; n++){
+      var idx = String(Math.floor(Math.random()*80)).padStart(4,'0');
+      var docId = band_lo + '_' + idx;
+      db.collection('puzzle_paths').doc(docId).get().then(function(snap){
+        if(snap.exists){
+          var puzzles = snap.data().puzzles || [];
+          var T = window.FST_THEMES || [];
+          puzzles.forEach(function(p){
+            var raw;
+            if(Array.isArray(p)){
+              raw = p;
+            } else {
+              var fen = p.f + ' - 0 1';
+              var themes = (p.t||[]).map(function(i){ return T[i]||''; }).filter(Boolean).join(' ');
+              raw = [p.i, fen, p.m, p.r, themes];
+            }
+            window.FST.pool.push(raw);
+          });
+        }
+        fetched++;
+        if(fetched >= needed) window.FST.fetching = false;
+      }).catch(function(){ fetched++; if(fetched>=needed) window.FST.fetching=false; });
+    }
+  }
+
+  /* ── Wire the theme dropdown change event ───────────── */
+  function wireThemeSelect(){
+    var sel = document.getElementById('theme-select') || document.querySelector('select');
+    if(!sel){ setTimeout(wireThemeSelect, 300); return; }
+
+    sel.addEventListener('change', function(){
+      var theme = sel.value || '';
+      window.FST.themeFilter = theme;
+      console.log('[FST theme] filter set to:', theme || 'all');
+
+      /* Immediately load a puzzle matching the new theme */
+      window.newPuzzle();
+    });
+    console.log('[FST theme] change handler wired');
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(wireThemeSelect,200); });
+  } else {
+    setTimeout(wireThemeSelect, 200);
+  }
+
 })();
 </script>
 
