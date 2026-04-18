@@ -454,8 +454,8 @@ newPuzzle();
       document.getElementById('uini').textContent=(user.displayName||user.email)[0].toUpperCase();
       document.getElementById('abadge').style.display=isAdmin?'inline-flex':'none';
       if(user.photoURL) document.getElementById('uav').innerHTML='<img src="'+user.photoURL+'" alt="avatar"/>';
-      badge.style.display='flex';
       if(nav && !nav.contains(badge)) nav.appendChild(badge);
+      badge.style.setProperty('display','flex','important');
       db.ref('users/'+user.uid).update({
         email:user.email,
         name:user.displayName||user.email.split('@')[0],
