@@ -6119,90 +6119,213 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776526333 -->
+<!-- sgm:1776526370 -->
 
 <script id="fst-engine">
 (function(){
+/* ═══════════════════════════════════════════════════════════
+   SGM Firestore Puzzle Engine  v2.0
+   Loads puzzles from Firestore puzzle_paths collection.
+   Pool format: raw array [id, fen, moves_str, rating, themes_str]
+   Fallback: embedded PUZZLES array if Firestore pool empty.
+   ═══════════════════════════════════════════════════════════ */
+
 var T=["advancedPawn","advantage","anastasiaMate","arabianMate","attackingF2F7","attraction","backRankMate","balestraMate","bishopEndgame","blindSwineMate","capturingDefender","clearance","collinearMove","cornerMate","crushing","defensiveMove","deflection","discoveredAttack","discoveredCheck","doubleBishopMate","doubleCheck","dovetailMate","enPassant","endgame","epauletteMate","equality","exposedKing","fork","hangingPiece","hookMate","interference","intermezzo","killBoxMate","kingsideAttack","knightEndgame","long","master","masterVsMaster","mate","mateIn1","mateIn2","mateIn3","mateIn4","mateIn5","middlegame","morphysMate","oneMove","opening","operaMate","pawnEndgame","pillsburysMate","pin","promotion","queenEndgame","queenRookEndgame","queensideAttack","quietMove","rookEndgame","sacrifice","short","skewer","smotheredMate","swallowstailMate","trappedPiece","triangleMate","veryLong","vukovicMate","xRayAttack","zugzwang"];
-window.FST_THEMES=T;/* BUG2-FIX */
+window.FST_THEMES = T;
 
-window.FST_THEMES=T;/* BUG2-FIX */
+/* ── State ─────────────────────────────────────────────── */
+var FST = window.FST || {pool:[], ready:false, fetching:false};
+window.FST = FST;
 
-window.FST={db:null,pool:[],ready:false,fetching:false};
-
-function dec(p){
-  // p = {i, f, m, r, t}
-  // Returns raw array: [id, fen_initial, moves_str, rating, themes]
-  var themes=(p.t||[]).map(function(i){return T[i]||'';}).filter(Boolean).join(' ');
-  return [p.i, p.f+' - 0 1', p.m, p.r, themes];
+/* ── Helpers ────────────────────────────────────────────── */
+function getR(){
+  /* Get user's current Glicko rating (fallback 1500) */
+  try {
+    if(window.myGlicko && window.myGlicko.rating) return Math.round(window.myGlicko.rating);
+    var lbEl = document.getElementById('lb-your-rating');
+    if(lbEl){ var m=lbEl.textContent.match(/\d+/); if(m) return parseInt(m[0]); }
+  } catch(e){}
+  return 1500;
 }
 
-function fetch_band(rating){
-  if(FST.fetching||!FST.db) return;
-  FST.fetching=true;
-  var band=Math.floor(rating/100)*100;
-  FST.db.collection('puzzle_paths').where('band_lo','==',band).limit(50).get()
-    .then(function(snap){
-      if(!snap.empty){
-        var docs=snap.docs;
-        var data=docs[Math.floor(Math.random()*docs.length)].data();
-        var pzs=(data.puzzles||[]).map(dec);
-        for(var i=pzs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pzs[i];pzs[i]=pzs[j];pzs[j]=t;}
-        pzs.forEach(function(p){FST.pool.push(p);});
-        console.log('[FST] loaded',pzs.length,'puzzles, pool=',FST.pool.length);
+function bandFor(rating){
+  /* Map rating to nearest 100-point band_lo used in Firestore */
+  var lo = Math.floor(Math.max(300, Math.min(3200, rating)) / 100) * 100;
+  return lo;
+}
+
+function pickDocId(band_lo){
+  /* Pick a random chunk index for that band (100 puzzles/doc, ~1000 docs/band est.) */
+  var idx = Math.floor(Math.random() * 80); // 0-79 = safe range for all bands
+  return band_lo + '_' + String(idx).padStart(4,'0');
+}
+
+function fetchBand(rating){
+  if(FST.fetching) return;
+  if(FST.pool.length > 20) return; // enough puzzles already
+  FST.fetching = true;
+  var band_lo = bandFor(rating);
+
+  /* Pick 2 random chunks to give 200 puzzles */
+  var docIds = [pickDocId(band_lo), pickDocId(band_lo)];
+  var db = FST.db || firebase.firestore();
+  FST.db = db;
+
+  var loaded = 0;
+  docIds.forEach(function(docId){
+    db.collection('puzzle_paths').doc(docId).get().then(function(snap){
+      if(snap.exists){
+        var data = snap.data();
+        var puzzles = data.puzzles || [];
+        /* Convert compact {i,f,m,r,t} to raw array [id,fen,moves,rating,themes] */
+        puzzles.forEach(function(p){
+          var raw;
+          if(Array.isArray(p)){
+            raw = p; // already raw array format
+          } else {
+            /* Compact object format from sgm_builder.py */
+            var fen = p.f + ' - 0 1';
+            var themes = (p.t||[]).map(function(i){ return T[i]||''; }).filter(Boolean).join(' ');
+            raw = [p.i, fen, p.m, p.r, themes];
+          }
+          FST.pool.push(raw);
+        });
+        console.log('[FST] loaded', puzzles.length, 'from', docId, '— pool:', FST.pool.length);
+      } else {
+        /* Doc doesn't exist — try adjacent chunk */
+        var fallbackId = band_lo + '_' + String(Math.floor(Math.random()*10)).padStart(4,'0');
+        db.collection('puzzle_paths').doc(fallbackId).get().then(function(s2){
+          if(s2.exists){
+            var d2 = s2.data(); var pz2 = d2.puzzles||[];
+            pz2.forEach(function(p){
+              FST.pool.push(Array.isArray(p)?p:[p.i,p.f+' - 0 1',(p.t||[]).map(function(i){return T[i]||'';}).filter(Boolean).join(' ')]);
+            });
+          }
+        }).catch(function(){});
       }
-    })
-    .catch(function(e){console.warn('[FST]',e.message);})
-    .finally(function(){FST.fetching=false;});
+      loaded++;
+      if(loaded === docIds.length){ FST.fetching = false; FST.ready = true; }
+    }).catch(function(e){
+      console.warn('[FST] fetch error:', e.message);
+      loaded++;
+      if(loaded === docIds.length){ FST.fetching = false; }
+    });
+  });
 }
 
-function getR(){try{return Math.round(window.myGlicko&&window.myGlicko.rating||1500);}catch(e){return 1500;}}
+/* ── Build curPz from raw puzzle array ─────────────────── */
+function buildCurPz(raw){
+  try {
+    var sCh = new Chess(raw[1]);
+    var moves = raw[2].split(' ');
+    sCh.move({from:moves[0].slice(0,2), to:moves[0].slice(2,4), promotion:moves[0][4]||'q'});
+    return {
+      fen:    sCh.fen(),
+      sol:    moves.slice(1),
+      color:  sCh.turn(),
+      rating: raw[3],
+      themes: raw[4] || '',
+      id:     raw[0]
+    };
+  } catch(e) {
+    console.warn('[FST] buildCurPz error:', e.message);
+    return null;
+  }
+}
 
+/* ── Update puzzle info panel ───────────────────────────── */
+function updatePuzzleInfo(pz){
+  /* Puzzle ID link */
+  var idEl = document.querySelector('a[href*="lichess.org/training"]');
+  if(idEl){ idEl.href = 'https://lichess.org/training/' + pz.id; idEl.textContent = '#' + pz.id; }
+  /* Rating */
+  var ratingEls = document.querySelectorAll('.puzzle__info span, .pz-rating');
+  ratingEls.forEach(function(el){ if(el.textContent.match(/^\d+$/)) el.textContent = pz.rating; });
+  /* Also find rating by searching for the rating text node near "Rating:" */
+  var allText = document.querySelectorAll('.puzzle__info *');
+  allText.forEach(function(el){
+    if(el.children.length===0 && el.textContent.trim().match(/^\d{3,4}$/)){
+      el.textContent = pz.rating;
+    }
+  });
+}
+
+/* ── FST newPuzzle override ─────────────────────────────── */
+function fstNewPuzzle(){
+  /* Refill pool if running low */
+  if(FST.pool.length < 10) fetchBand(getR());
+
+  var raw = null;
+  if(FST.pool.length > 0){
+    raw = FST.pool.shift(); // take from front
+  }
+
+  if(!raw){
+    /* Fallback to embedded PUZZLES */
+    console.warn('[FST] pool empty — falling back to embedded PUZZLES');
+    if(window._fstOrigNewPuzzle) { window._fstOrigNewPuzzle(); return; }
+    return;
+  }
+
+  var pz = buildCurPz(raw);
+  if(!pz){
+    /* Bad puzzle — recurse once */
+    fstNewPuzzle(); return;
+  }
+
+  window.curPz = pz;
+  window._pzShowingSolution = false;
+  window.drawPuzzle();
+  updatePuzzleInfo(pz);
+}
+
+/* ── Install override ───────────────────────────────────── */
 function installOverride(){
-  if(typeof window.newPuzzle!=='function'){setTimeout(installOverride,300);return;}
-  var _orig=window.newPuzzle;
-  window.newPuzzle=function(){
-    var r=getR();
-    if(FST.pool.length<15) fetch_band(r);
-    if(FST.ready&&FST.pool.length>0){
-      var raw=FST.pool.shift(); // [id, fen_initial, moves_str, rating, themes]
-      try{
-        var ch=new Chess(raw[1]);           // start from initial FEN
-        var moves=raw[2].split(' ');
-        var m0=moves[0];
-        // Play opponent's first move
-        ch.move({from:m0.slice(0,2),to:m0.slice(2,4),promotion:m0[4]||'q'});
-        // Set curPz exactly as newPuzzle() does
-        window.curPz={
-          fen: ch.fen(),
-          sol: moves.slice(1),
-          color: ch.turn(),
-          rating: raw[3],
-          themes: raw[4],
-          id: raw[0]
-        };
-        if(typeof drawPuzzle==='function') drawPuzzle();
-        return;
-      }catch(e){
-        console.warn('[FST] puzzle error:',e.message,'- falling back');
+  if(typeof window.drawPuzzle !== 'function'){
+    setTimeout(installOverride, 200); return;
+  }
+  if(typeof Chess === 'undefined'){
+    setTimeout(installOverride, 200); return;
+  }
+  /* Save original and replace */
+  if(!window._fstOrigNewPuzzle){
+    window._fstOrigNewPuzzle = window.newPuzzle;
+  }
+  window.newPuzzle = fstNewPuzzle;
+  /* Update puzzle count display */
+  var countEl = document.querySelector('.pz-count, [class*="puzzle-count"]');
+  if(!countEl){
+    /* Find element showing "5,000 puzzles" */
+    var allEls = document.querySelectorAll('*');
+    for(var i=0;i<allEls.length;i++){
+      if(allEls[i].children.length===0 && allEls[i].textContent.includes('5,000 puzzles')){
+        allEls[i].textContent='1,470,658 puzzles'; break;
       }
     }
-    _orig();
-  };
-  console.log('[FST] override installed');
+  }
+  console.log('[FST] v2.0 override installed — pool:', FST.pool.length);
+  /* Load first puzzle from Firestore immediately */
+  window.newPuzzle();
 }
 
-window.addEventListener('load',function(){
+/* ── Boot ───────────────────────────────────────────────── */
+window.addEventListener('load', function(){
   setTimeout(function(){
-    try{
-      FST.db=firebase.firestore();
-      FST.ready=true;
-      console.log('[FST] ready');
-      fetch_band(getR());
-      installOverride();
-    }catch(e){console.warn('[FST] init:',e.message);}
-  },1000);
+    try {
+      fetchBand(getR());
+      /* Wait for pool to fill then install */
+      var attempts = 0;
+      var waitForPool = setInterval(function(){
+        attempts++;
+        if(FST.pool.length > 0 || attempts > 30){
+          clearInterval(waitForPool);
+          installOverride();
+        }
+      }, 200);
+    } catch(e){ console.warn('[FST] boot error:', e.message); }
+  }, 500);
 });
+
 })();
 </script>
 <script>
