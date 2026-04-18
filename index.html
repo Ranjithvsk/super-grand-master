@@ -266,46 +266,9 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 <!-- FILTER BAR -->
 <div id="filter-bar">
   <label>Theme</label>
-  <select id="f-theme">
-    <option value="">All Themes</option>
-    <optgroup label="Tactics">
-      <option value="fork">Fork (714)</option>
-      <option value="pin">Pin (333)</option>
-      <option value="skewer">Skewer (122)</option>
-      <option value="discoveredAttack">Discovered Attack (265)</option>
-      <option value="deflection">Deflection (261)</option>
-      <option value="attraction">Attraction (232)</option>
-      <option value="sacrifice">Sacrifice (388)</option>
-      <option value="clearance">Clearance (62)</option>
-      <option value="intermezzo">Intermezzo (77)</option>
-      <option value="hangingPiece">Hanging Piece (195)</option>
-      <option value="trappedPiece">Trapped Piece (68)</option>
-      <option value="defensiveMove">Defensive Move (219)</option>
-      <option value="quietMove">Quiet Move (131)</option>
-    </optgroup>
-    <optgroup label="Mate Patterns">
-      <option value="mateIn1">Mate in 1 (519)</option>
-      <option value="mateIn2">Mate in 2 (654)</option>
-      <option value="mateIn3">Mate in 3 (200)</option>
-      <option value="backRankMate">Back Rank Mate (86)</option>
-      <option value="exposedKing">Exposed King (136)</option>
-      <option value="kingsideAttack">Kingside Attack (415)</option>
-      <option value="queensideAttack">Queenside Attack (64)</option>
-    </optgroup>
-    <optgroup label="Endgame">
-      <option value="rookEndgame">Rook Endgame (230)</option>
-      <option value="pawnEndgame">Pawn Endgame (137)</option>
-      <option value="queenEndgame">Queen Endgame (68)</option>
-      <option value="bishopEndgame">Bishop Endgame (65)</option>
-      <option value="advancedPawn">Advanced Pawn (292)</option>
-      <option value="promotion">Promotion (123)</option>
-    </optgroup>
-    <optgroup label="Phase">
-      <option value="opening">Opening (277)</option>
-      <option value="middlegame">Middlegame (2329)</option>
-      <option value="endgame">Endgame (2394)</option>
-    </optgroup>
-  </select>
+  <select id="theme-select">
+<option value="">All Themes</option>
+</select>
   <div class="filter-sep"></div>
   <label>Difficulty</label>
   <select id="f-diff"><option value="easiest" data-delta="-600">Easiest</option><option value="easier" data-delta="-300">Easier</option><option value="normal" data-delta="0" selected>Normal</option><option value="harder" data-delta="300">Harder</option><option value="hardest" data-delta="600">Hardest</option></select>
@@ -6119,7 +6082,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776526370 -->
+<!-- sgm:1776526903 -->
 
 <script id="fst-engine">
 (function(){
@@ -6390,5 +6353,86 @@ window.addEventListener('load', function(){
   },600);
 })();
 </script>
+
+<script>
+/* fix_themes: populate all 69 FST_THEMES into theme dropdown */
+(function(){
+  /* camelCase → "Title Case With Spaces" */
+  function fmt(s){
+    return s
+      .replace(/([A-Z])/g,' $1')
+      .replace(/^./,function(c){return c.toUpperCase();})
+      .trim();
+  }
+
+  /* All 69 themes in display order — grouped logically */
+  var ORDERED = [
+    /* Tactics */
+    "fork","pin","skewer","deflection","discoveredAttack","discoveredCheck",
+    "doubleCheck","attraction","clearance","interference","intermezzo",
+    "sacrifice","hangingPiece","trappedPiece","capturingDefender",
+    "xRayAttack","quietMove","defensiveMove","collinearMove","zugzwang",
+    /* Mate patterns */
+    "mateIn1","mateIn2","mateIn3","mateIn4","mateIn5",
+    "mate","backRankMate","smotheredMate","anastasiaMate","arabianMate",
+    "balestraMate","blindSwineMate","cornerMate","doubleBishopMate",
+    "dovetailMate","epauletteMate","hookMate","killBoxMate","morphysMate",
+    "operaMate","pillsburysMate","swallowstailMate","triangleMate","vukovicMate",
+    /* Attack */
+    "exposedKing","kingsideAttack","queensideAttack","attackingF2F7",
+    /* Phase */
+    "opening","middlegame","endgame",
+    /* Endgames */
+    "rookEndgame","queenRookEndgame","queenEndgame","pawnEndgame",
+    "knightEndgame","bishopEndgame",
+    /* Other */
+    "advancedPawn","promotion","enPassant",
+    "long","veryLong","short","oneMove",
+    "crushing","advantage","equality",
+    "master","masterVsMaster"
+  ];
+
+  function buildThemeSelect(){
+    var sel = document.getElementById('theme-select');
+    if(!sel){ console.warn('[themes] select not found'); return; }
+
+    /* Get themes from FST_THEMES global (set by FST engine) or use ORDERED */
+    var themes = (typeof window.FST_THEMES !== 'undefined') ? window.FST_THEMES : ORDERED;
+
+    /* Build ordered list — ORDERED first (if in themes), then any extras */
+    var seen = {};
+    var ordered = [];
+    ORDERED.forEach(function(t){
+      if(themes.indexOf(t) > -1){ ordered.push(t); seen[t]=1; }
+    });
+    themes.forEach(function(t){
+      if(!seen[t]){ ordered.push(t); seen[t]=1; }
+    });
+
+    /* Clear existing options except "All Themes" */
+    while(sel.options.length > 1) sel.remove(1);
+
+    /* Add all 69 */
+    ordered.forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = fmt(t);
+      sel.appendChild(opt);
+    });
+
+    console.log('[themes] populated', sel.options.length - 1, 'themes');
+  }
+
+  /* Run after FST engine has loaded (which exposes FST_THEMES) */
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(buildThemeSelect, 100);
+    });
+  } else {
+    setTimeout(buildThemeSelect, 100);
+  }
+})();
+</script>
+
 </body>
 </html>
