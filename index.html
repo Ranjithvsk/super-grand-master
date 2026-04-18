@@ -5700,24 +5700,41 @@ function newPuzzle(){
 }
 function drawPuzzle() {
   renderMoves();
-  const pieces = chessToGround(chess);
   const check = getCheckSq(chess);
+  const playerColor = curPz?.color === 'w' ? 'white' : 'black';
+  const isPlayerTurn = !pzDone && chess.turn() === curPz?.color;
+
   if (!cgPuzzle) {
     cgPuzzle = initCG('pboard', function(from, to) {
-      doPzMove(from, to);
+      // Validate move against solution BEFORE accepting it
+      const exp = curPz?.sol[pzIdx];
+      const uci = from + to;
+      if (exp && uci === exp) {
+        doPzMove(from, to);
+      } else {
+        // Wrong move - show error and reset board
+        st.a++; st.k=0; saveSt(); applyPuzzleResult(false);
+        showPrompt('fail');
+        // Reset board to correct position
+        setTimeout(() => drawPuzzle(), 100);
+      }
     });
   }
+
   cgPuzzle.set({
     fen: chess.fen(),
     orientation: flipped ? 'black' : 'white',
     turnColor: chess.turn() === 'w' ? 'white' : 'black',
-    check: check,
+    check: check || false,
     lastMove: lastMv ? [lastMv.from, lastMv.to] : undefined,
     movable: {
       free: false,
-      color: !pzDone ? (chess.turn() === 'w' ? 'white' : 'black') : undefined,
-      dests: !pzDone ? groundDests(chess) : new Map()
-    }
+      color: isPlayerTurn ? playerColor : undefined,
+      dests: isPlayerTurn ? groundDests(chess) : new Map(),
+      showDests: true
+    },
+    highlight: { lastMove: true, check: true },
+    animation: { enabled: true, duration: 200 }
   });
 }
 function onPzSq(sq){
