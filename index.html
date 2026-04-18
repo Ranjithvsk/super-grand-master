@@ -259,7 +259,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
     <a class="active" onclick="switchView('puzzles')">PUZZLES</a>
     <a onclick="switchView('play')">PLAY</a>
     <a onclick="switchView('stats')">STATS</a>
-    <a onclick="switchView('profile')">PROFILE</a>
+    <a onclick="switchView('profile')">PROFILE</a><a onclick="switchView('leaderboard')">LEADERBOARD</a>
   </div>
 </header>
 
@@ -5427,9 +5427,9 @@ function switchView(v){
   document.getElementById('v-stats').classList.toggle('hidden',v!=='stats');
   document.getElementById('v-profile').classList.toggle('hidden',v!=='profile');
   if(document.getElementById('v-leaderboard')) document.getElementById('v-leaderboard').classList.toggle('hidden',v!=='leaderboard');
-  if(document.getElementById('v-leaderboard')) document.getElementById('v-leaderboard').classList.toggle('hidden',v!=='leaderboard');
   if(v==='stats')updStats();
   if(v==='profile')updProfile();
+  if(v==='leaderboard')updLeaderboard();
 }
 
 // === BOARD ===
@@ -6071,6 +6071,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776502901 -->
+<!-- sgm:1776503549 -->
 </body>
 </html>
