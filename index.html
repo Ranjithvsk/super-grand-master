@@ -6,6 +6,10 @@
 <title>Super Grand Master — Chess Trainer</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@lichess-org/chessground@10.1.1/dist/chessground.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.base.css">
+<link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.brown.css">
+<link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.cburnett.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -5396,48 +5400,69 @@ function switchView(v){
 }
 
 // === BOARD ===
-function drawBoard(id,ch,fl,canMove,onClick){
-  const el=document.getElementById(id);el.innerHTML='';
-  const b=ch.board();
-  const ksq=ch.in_check()?findKing(ch,ch.turn()):null;
-  for(let r=0;r<8;r++){for(let c=0;c<8;c++){
-    const rr=fl?7-r:r,cc=fl?7-c:c;
-    const f='abcdefgh'[cc],rk=8-rr,sq=f+rk,lt=(rr+cc)%2===0;
-    const d=document.createElement('div');
-    let cls='sq '+(lt?'light':'dark');
-    if(lastMv&&(sq===lastMv.from||sq===lastMv.to))cls+=' lastmove';
-    if(sq===sel)cls+=' selected';
-    if(sq===ksq)cls+=' check';
-    d.className=cls;d.dataset.sq=sq;
+// ── Chessground boards ─────────────────────────────────────
+let cgPuzzle = null; // Chessground instance for puzzle board
+let cgGame   = null; // Chessground instance for play board
 
-    // Coords
-    if(c===7){const s=document.createElement('span');s.className='coord coord-rank';s.textContent=rk;d.appendChild(s)}
-    if(r===7){const s=document.createElement('span');s.className='coord coord-file';s.textContent=f;d.appendChild(s)}
-
-    // Move hints
-    if(sel&&canMove){
-      const mvs=ch.moves({square:sel,verbose:true});
-      const m=mvs.find(x=>x.to===sq);
-      if(m){
-        if(m.captured||b[rr][cc]){const h=document.createElement('div');h.className='capture-ring';d.appendChild(h)}
-        else{const h=document.createElement('div');h.className='move-dot';d.appendChild(h)}
+function chessToGround(ch) {
+  // Convert chess.js board to chessground FEN pieces object
+  const pieces = new Map();
+  const b = ch.board();
+  const files = 'abcdefgh';
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const p = b[r][c];
+      if (p) {
+        const sq = files[c] + (8 - r);
+        const role = {p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'}[p.type];
+        pieces.set(sq, { role, color: p.color === 'w' ? 'white' : 'black' });
       }
     }
-
-    // Piece as background image (Lichess SVGs)
-    const pc=b[rr][cc];
-    if(pc){
-      const img=document.createElement('div');
-      img.className='piece-img';
-      img.style.backgroundImage='url("'+PIECE_SVG[pieceKey(pc)]+'")';
-      d.appendChild(img);
-    }
-
-    if(canMove){d.onclick=()=>onClick(sq);d.ontouchend=(e)=>{e.preventDefault();onClick(sq)}}
-    el.appendChild(d);
-  }}
+  }
+  return pieces;
 }
+
+function groundDests(ch) {
+  // Get legal move destinations for chessground
+  const dests = new Map();
+  const moves = ch.moves({ verbose: true });
+  moves.forEach(m => {
+    if (!dests.has(m.from)) dests.set(m.from, []);
+    dests.get(m.from).push(m.to);
+  });
+  return dests;
+}
+
+function getCheckSq(ch) {
+  if (!ch.in_check()) return undefined;
+  const b = ch.board();
+  const turn = ch.turn();
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 8; c++)
+      if (b[r][c] && b[r][c].type === 'k' && b[r][c].color === turn)
+        return 'abcdefgh'[c] + (8 - r);
+}
+
+function initCG(id, onMove) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  return Chessground(el, {
+    coordinates: true,
+    animation: { enabled: true, duration: 150 },
+    movable: { free: false, color: undefined, events: { after: onMove } },
+    draggable: { enabled: true },
+    selectable: { enabled: true },
+    highlight: { lastMove: true, check: true }
+  });
+}
+
+function drawBoard(id, ch, fl, canMove, onClick) {
+  // This is called but we use Chessground now
+  // Handled by drawPuzzle/drawGame directly
+}
+
 function findKing(ch,col){const b=ch.board();for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(p&&p.type==='k'&&p.color===col)return 'abcdefgh'[c]+(8-r)}return null}
+return null}
 
 // === PUZZLES ===
 function getFilteredPuzzles(){
@@ -5668,7 +5693,28 @@ function newPuzzle(){
   document.getElementById('pzRat').textContent=curPz.rating;
   showPrompt('turn');
 }
-function drawPuzzle(){drawBoard('pboard',chess,flipped,!pzDone,onPzSq);renderMoves()}
+function drawPuzzle() {
+  renderMoves();
+  const pieces = chessToGround(chess);
+  const check = getCheckSq(chess);
+  if (!cgPuzzle) {
+    cgPuzzle = initCG('pboard', function(from, to) {
+      doPzMove(from, to);
+    });
+  }
+  cgPuzzle.set({
+    fen: chess.fen(),
+    orientation: flipped ? 'black' : 'white',
+    turnColor: chess.turn() === 'w' ? 'white' : 'black',
+    check: check,
+    lastMove: lastMv ? [lastMv.from, lastMv.to] : undefined,
+    movable: {
+      free: false,
+      color: !pzDone ? (chess.turn() === 'w' ? 'white' : 'black') : undefined,
+      dests: !pzDone ? groundDests(chess) : new Map()
+    }
+  });
+}
 function onPzSq(sq){
   if(pzDone)return;
   if(sel){
@@ -5681,6 +5727,10 @@ function onPzSq(sq){
   }else{const pc=chess.get(sq);if(pc&&pc.color===chess.turn())sel=sq;drawPuzzle()}
 }
 function doPzMove(fr,to,pr){
+  // Check for promotion
+  const mvs=chess.moves({square:fr,verbose:true});
+  const mv=mvs.find(x=>x.to===to);
+  if(mv&&mv.flags.includes('p')&&!pr){showPromo(fr,to,chess.turn(),'pz');return;}
   const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
   if(uci===exp){
     chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
@@ -5732,8 +5782,39 @@ function evl(c){const b=c.board();let s=0;for(let r=0;r<8;r++)for(let l=0;l<8;l+
 function mmx(c,d,a,b,m){if(d===0||c.game_over()){if(c.in_checkmate())return m?-99999:99999;if(c.in_draw())return 0;return evl(c)}const ms=c.moves({verbose:true}).sort((a,b)=>(b.captured?PV[b.captured]:0)-(a.captured?PV[a.captured]:0));if(m){let v=-Infinity;for(const x of ms){c.move(x);const e=mmx(c,d-1,a,b,false);c.undo();v=Math.max(v,e);a=Math.max(a,e);if(b<=a)break}return v}else{let v=Infinity;for(const x of ms){c.move(x);const e=mmx(c,d-1,a,b,true);c.undo();v=Math.min(v,e);b=Math.min(b,e);if(b<=a)break}return v}}
 function getBest(c,l){const ms=c.moves({verbose:true});if(!ms.length)return null;if(l===1)return ms[Math.floor(Math.random()*ms.length)];const dp=Math.min(l-1,3);let bm=ms[0],bv=-Infinity;for(const m of ms){c.move(m);const v=-mmx(c,dp-1,-Infinity,Infinity,false)+(l<=2?(Math.random()-.5)*100:0);c.undo();if(v>bv){bv=v;bm=m}}return bm}
 
-function newGame(){pCol=document.getElementById('gcol').value;eLvl=parseInt(document.getElementById('glvl').value);gChess=new Chess();gOn=true;sel=null;lastMv=null;drawGame();updGS();if(pCol==='b')setTimeout(engMv,400)}
-function drawGame(){drawBoard('gboard',gChess,pCol==='b',gOn&&gChess.turn()===pCol,onGSq);document.getElementById('gmoves').innerHTML=fmtH()}
+function newGame(){
+  pCol=document.getElementById('gcol').value;
+  eLvl=parseInt(document.getElementById('glvl').value);
+  gChess=new Chess();gOn=true;sel=null;lastMv=null;
+  if(cgGame){cgGame.destroy();cgGame=null;} // reset board
+  drawGame();updGS();
+  if(pCol==='b')setTimeout(engMv,400);
+}
+function drawGame() {
+  document.getElementById('gmoves').innerHTML = fmtH();
+  if (!gChess) return;
+  if (!cgGame) {
+    cgGame = initCG('gboard', function(from, to, meta) {
+      const mvs = gChess.moves({square:from, verbose:true});
+      const mv = mvs.find(x => x.to === to);
+      if (mv && mv.flags.includes('p')) { showPromo(from, to, gChess.turn(), 'g'); return; }
+      doGMv(from, to);
+    });
+  }
+  const check = getCheckSq(gChess);
+  cgGame.set({
+    fen: gChess.fen(),
+    orientation: pCol === 'b' ? 'black' : 'white',
+    turnColor: gChess.turn() === 'w' ? 'white' : 'black',
+    check: check,
+    lastMove: lastMv ? [lastMv.from, lastMv.to] : undefined,
+    movable: {
+      free: false,
+      color: gOn && gChess.turn() === pCol ? (pCol === 'w' ? 'white' : 'black') : undefined,
+      dests: gOn && gChess.turn() === pCol ? groundDests(gChess) : new Map()
+    }
+  });
+}
 function onGSq(sq){if(!gOn||gChess.turn()!==pCol)return;if(sel){const ms=gChess.moves({square:sel,verbose:true});const m=ms.find(x=>x.to===sq);if(m){if(m.flags.includes('p')){showPromo(sel,sq,gChess.turn(),'g');return}doGMv(sel,sq)}else{const pc=gChess.get(sq);sel=pc&&pc.color===pCol?sq:null;drawGame()}}else{const pc=gChess.get(sq);if(pc&&pc.color===pCol)sel=sq;drawGame()}}
 function doGMv(f,t,p){gChess.move({from:f,to:t,promotion:p});lastMv={from:f,to:t};sel=null;drawGame();updGS();if(gChess.game_over()){endG();return}setTimeout(engMv,300)}
 function engMv(){if(!gOn||gChess.game_over())return;const m=getBest(gChess,eLvl);if(m){gChess.move(m);lastMv={from:m.from,to:m.to};drawGame();updGS();if(gChess.game_over())endG()}}
