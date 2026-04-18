@@ -5645,6 +5645,25 @@ function updNavElo() {
   el.title = 'Puzzle rating (RD: ' + Math.round(myGlicko.rd) + ')';
 }
 
+
+function applyWrongMove() {
+  // Immediate rating deduction for each wrong move (Lichess-style)
+  // Uses a high assumed-RD so the deduction is smaller per mistake
+  const user = firebase.auth().currentUser;
+  if (!user || !curPz) return;
+  const result = G2.update(myGlicko, curPz.rating, 200, 0);
+  const delta = result.rating - myGlicko.rating;
+  myGlicko = result;
+  saveGlicko(user.uid);
+  updNavElo();
+  // Show rating badge
+  const badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;bottom:80px;right:20px;background:#262421;border:1px solid #cc3333;color:#cc3333;padding:8px 14px;border-radius:6px;font-weight:800;font-size:16px;z-index:999;transition:opacity 1s';
+  badge.textContent = delta + ' (' + G2.display(myGlicko.rating, myGlicko.rd) + ')';
+  document.body.appendChild(badge);
+  setTimeout(() => { badge.style.opacity = '0'; setTimeout(() => badge.remove(), 1000); }, 1500);
+}
+
 function applyPuzzleResult(solved) {
   const user = firebase.auth().currentUser;
   if (!user || !curPz) return;
@@ -5720,7 +5739,7 @@ function newPuzzle(){
   const om=moves[0];
   sCh.move({from:om.slice(0,2),to:om.slice(2,4),promotion:om.length>4?om[4]:undefined});
   curPz={fen:sCh.fen(),sol:moves.slice(1),color:sCh.turn(),rating:raw[3],themes:raw[4],id:raw[0]};
-  pzIdx=0;pzDone=false;sel=null;
+  pzIdx=0;pzDone=false;sel=null;pzFailed=false;pzWrongCount=0;
   chess=new Chess(curPz.fen);
   flipped=curPz.color==='b';
   lastMv={from:om.slice(0,2),to:om.slice(2,4)};
@@ -5746,8 +5765,9 @@ function drawPuzzle() {
       } else {
         // Wrong move - show error and reset board
         st.a++; st.k=0; saveSt();
+        pzFailed=true; pzWrongCount++;
         showPrompt('fail');
-        try{applyPuzzleResult(false);}catch(e){console.warn('[SGM]',e.message);}
+        try{applyWrongMove();}catch(e){console.warn('[SGM]',e.message);}
         // Reset board visuals only (keeps 'That's not it' visible)
         setTimeout(() => {
           if(cgPuzzle && curPz){
@@ -5797,12 +5817,12 @@ function doPzMove(fr,to,pr){
   const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
   if(uci===exp){
     chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
-    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(true);}catch(e){console.warn('[SGM]',e.message);}drawPuzzle();return}
+    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(!pzFailed);}catch(e){console.warn('[SGM]',e.message);}drawPuzzle();return}
     showPrompt('good');drawPuzzle();
     setTimeout(()=>{
       const op=curPz.sol[pzIdx];chess.move({from:op.slice(0,2),to:op.slice(2,4),promotion:op.length>4?op[4]:undefined});
       lastMv={from:op.slice(0,2),to:op.slice(2,4)};pzIdx++;
-      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(true);}catch(e){console.warn('[SGM]',e.message);}}
+      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(!pzFailed);}catch(e){console.warn('[SGM]',e.message);}}
       else setTimeout(()=>showPrompt('turn'),600);
       drawPuzzle();
     },400);
@@ -5827,7 +5847,7 @@ function showPrompt(type){
   }
 }
 function pzHint(){if(!curPz||pzDone)return;sel=curPz.sol[pzIdx].slice(0,2);if(cgPuzzle)cgPuzzle.selectSquare(sel);drawPuzzle()}
-function pzSolution(){if(!curPz)return;pzDone=true;let i=pzIdx;(function go(){if(i>=curPz.sol.length){showPrompt('success');return}const m=curPz.sol[i];chess.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m.length>4?m[4]:undefined});lastMv={from:m.slice(0,2),to:m.slice(2,4)};i++;drawPuzzle();setTimeout(go,500)})()}
+function pzSolution(){if(!curPz)return;pzDone=true;if(!pzFailed){pzFailed=true;try{applyWrongMove();}catch(e){}};let i=pzIdx;(function go(){if(i>=curPz.sol.length){showPrompt('success');return}const m=curPz.sol[i];chess.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m.length>4?m[4]:undefined});lastMv={from:m.slice(0,2),to:m.slice(2,4)};i++;drawPuzzle();setTimeout(go,500)})()}
 function renderMoves(){
   const el=document.getElementById('movesList');
   const h=chess.history();
@@ -6071,6 +6091,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776503549 -->
+<!-- sgm:1776504004 -->
 </body>
 </html>
