@@ -151,7 +151,22 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 #user-badge .abadge{background:#629924;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;text-transform:uppercase}
 #btn-out{padding:5px 10px;background:none;border:1px solid #3a3632;border-radius:3px;color:#999;font-size:12px;cursor:pointer;font-family:inherit}
 #btn-out:hover{background:#302e2b;color:#fff}
-
+/* PROFILE VIEW */
+.profile-page{max-width:480px;margin:0 auto;padding:30px 12px}
+.profile-section{text-align:center;margin-bottom:24px}
+.profile-avatar{width:80px;height:80px;border-radius:50%;background:#629924;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;margin:0 auto 16px;overflow:hidden}
+.profile-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-name{font-size:22px;font-weight:800;color:#fff;text-align:center;margin-bottom:4px}
+.profile-email{font-size:13px;color:#666;text-align:center;margin-bottom:8px}
+.profile-role{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:24px}
+.profile-role.admin{background:#629924;color:#fff}
+.profile-role.user{background:#302e2b;color:#999;border:1px solid #3a3632}
+.profile-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.profile-stat{background:#262421;border-radius:6px;padding:18px;text-align:center}
+.profile-stat .num{font-size:30px;font-weight:800;color:#629924}
+.profile-stat .lbl{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.profile-sync-note{font-size:12px;color:#629924;text-align:center;margin-bottom:8px}
+.profile-joined{font-size:12px;color:#555;text-align:center}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script></head>
 <body>
