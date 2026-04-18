@@ -5,7 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Super Grand Master — Chess Trainer</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@lichess-org/chessground@10.1.1/dist/chessground.min.js"></script>
+<script>
+/* Chessground - loaded as module and exposed globally */
+</script>
+<script type="module">
+import { Chessground } from 'https://unpkg.com/@lichess-org/chessground@10.1.1/dist/chessground.js';
+window.Chessground = Chessground;
+// Signal ready
+window._cgReady = true;
+document.dispatchEvent(new Event('cgready'));
+</script>
+<script>
+// Wait for Chessground to be ready before initializing puzzles
+window._cgReadyCallbacks = [];
+window._onCgReady = function(cb) {
+  if (window.Chessground) cb();
+  else document.addEventListener('cgready', cb, {once:true});
+};
+</script>
 <script>if(typeof Chessground==="undefined"&&typeof chessground!=="undefined"){window.Chessground=chessground.Chessground;}</script>
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.base.css">
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.brown.css">
@@ -5461,7 +5478,11 @@ function getCheckSq(ch) {
 function initCG(id, onMove) {
   const el = document.getElementById(id);
   if (!el) return null;
-  if (!window.Chessground) { console.error('Chessground not ready'); return null; }
+  if (!window.Chessground) {
+    // Chessground not ready yet - retry after it loads
+    window._onCgReady ? window._onCgReady(() => { if(!cgPuzzle && id==='pboard') drawPuzzle(); if(!cgGame && id==='gboard') drawGame(); }) : setTimeout(() => drawPuzzle(), 500);
+    return null;
+  }
   return window.Chessground(el, {
     coordinates: true,
     animation: { enabled: true, duration: 150 },
