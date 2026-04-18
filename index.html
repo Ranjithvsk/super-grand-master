@@ -307,13 +307,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
   </select>
   <div class="filter-sep"></div>
   <label>Difficulty</label>
-  <select id="f-diff">
-    <option value="">All</option>
-    <option value="beginner">Beginner (900-1199)</option>
-    <option value="intermediate">Intermediate (1200-1499)</option>
-    <option value="advanced">Advanced (1500-1799)</option>
-    <option value="expert">Expert (1800-2000)</option>
-  </select>
+  <select id="f-diff"><option value="easiest" data-delta="-600">Easiest</option><option value="easier" data-delta="-300">Easier</option><option value="normal" data-delta="0" selected>Normal</option><option value="harder" data-delta="300">Harder</option><option value="hardest" data-delta="600">Hardest</option></select>
   <div class="filter-sep"></div>
   <label>Moves</label>
   <select id="f-moves">
@@ -5716,7 +5710,25 @@ function updLeaderboard() {
 
 function newPuzzle(){
   const pool=getFilteredPuzzles();
-  const raw=pool[Math.floor(Math.random()*pool.length)];
+  // Lichess-exact puzzle selection: pick puzzle near user's rating
+  function selectByRating(pool, targetRating, compromise) {
+    const flex = (100 + Math.abs(1500 - targetRating) / 4) * (1 + compromise * 0.5);
+    const lo = targetRating - flex, hi = targetRating + flex;
+    const candidates = pool.filter(p => p[3] >= lo && p[3] <= hi);
+    if (candidates.length > 0) return candidates[Math.floor(Math.random() * candidates.length)];
+    return null;
+  }
+  // Get difficulty delta from dropdown (Lichess: Normal=0, Harder=+300, etc.)
+  const diffEl = document.getElementById('f-diff');
+  const diffDelta = diffEl ? parseInt(diffEl.selectedOptions[0]?.dataset?.delta || '0') : 0;
+  const userRating = Math.round(myGlicko?.rating || 1500);
+  const targetRating = userRating + diffDelta;
+  let raw = null;
+  for (let compromise = 0; compromise <= 5; compromise++) {
+    raw = selectByRating(pool, targetRating, compromise);
+    if (raw) break;
+  }
+  if (!raw) raw = pool[Math.floor(Math.random() * pool.length)]; // fallback: full pool
   const sCh=new Chess(raw[1]);
   const moves=raw[2].split(' ');
   const om=moves[0];
@@ -6073,6 +6085,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776508843 -->
+<!-- sgm:1776509344 -->
 </body>
 </html>
