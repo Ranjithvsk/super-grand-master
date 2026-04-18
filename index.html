@@ -5570,7 +5570,7 @@ const G2 = {
 
     // Step 5: update volatility (Illinois algorithm)
     const a = Math.log(player.vol * player.vol);
-    const A = a;
+    let A = a;
     let B;
     if (delta * delta > phi * phi + v) {
       B = Math.log(delta * delta - phi * phi - v);
@@ -5813,7 +5813,7 @@ function showPrompt(type){
     el.innerHTML='<div class="result">\u2717 That\'s not it</div><div class="instruction">Try something else.</div><div class="actions"><a onclick="pzHint()">GET A HINT</a><a onclick="pzSolution()">VIEW THE SOLUTION</a></div>';
   }
 }
-function pzHint(){if(!curPz||pzDone)return;sel=curPz.sol[pzIdx].slice(0,2);drawPuzzle()}
+function pzHint(){if(!curPz||pzDone)return;sel=curPz.sol[pzIdx].slice(0,2);if(cgPuzzle)cgPuzzle.selectSquare(sel);drawPuzzle()}
 function pzSolution(){if(!curPz)return;pzDone=true;let i=pzIdx;(function go(){if(i>=curPz.sol.length){showPrompt('success');return}const m=curPz.sol[i];chess.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m.length>4?m[4]:undefined});lastMv={from:m.slice(0,2),to:m.slice(2,4)};i++;drawPuzzle();setTimeout(go,500)})()}
 function renderMoves(){
   const el=document.getElementById('movesList');
@@ -6056,6 +6056,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776499027 -->
+
+<!-- sgm:1776499739 -->
 </body>
 </html>
