@@ -153,7 +153,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 #btn-out:hover{background:#302e2b;color:#fff}
 
 </style>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script></head>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script></head>
 <body>
 
 <!-- TOP NAV -->
@@ -406,6 +406,8 @@ newPuzzle();
 
 <script>
 (function(){
+  const FIREBASE_CONFIG={apiKey:"AIzaSyCA8oHffDPJP3fXGbQ5zJupPVJ0KsV7dhU",authDomain:"super-grand-master.firebaseapp.com",projectId:"super-grand-master",storageBucket:"super-grand-master.firebasestorage.app",messagingSenderId:"663805467661",appId:"1:663805467661:web:5d6e6584d3142b749d4944",databaseURL:"https://super-grand-master-default-rtdb.asia-southeast1.firebasedatabase.app"};
+  if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   const ADMINS=['ranjith.vsk@gmail.com'];
   const auth=firebase.auth();
   const db=firebase.database();

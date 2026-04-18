@@ -16,7 +16,7 @@
 
 ## 2. ACCOUNTS & SERVICES
 
-### Firebase (Hosting + Database)
+### Firebase (Hosting + Database + Auth)
 - **Project Name:** Super Grand Master
 - **Project ID:** super-grand-master
 - **Console:** https://console.firebase.google.com/u/0/project/super-grand-master/overview
@@ -28,7 +28,11 @@
 - **App ID:** 1:663805467661:web:5d6e6584d3142b749d4944
 - **Measurement ID:** G-CJCMN4CP5N
 
-### Firebase Config (embed in index.html)
+### Firebase Auth Providers (Both Enabled)
+- ✅ Google Sign-In
+- ✅ Email/Password
+
+### Firebase Config (embedded in index.html)
 ```javascript
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCA8oHffDPJP3fXGbQ5zJupPVJ0KsV7dhU",
@@ -42,19 +46,31 @@ const FIREBASE_CONFIG = {
 };
 ```
 
-### GitHub (Version Control)
+### Firebase SDK (in index.html head)
+```html
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+```
+
+### GitHub
 - **Repository:** https://github.com/Ranjithvsk/super-grand-master
 - **Username:** Ranjithvsk
 - **Account:** ranjith.vsk@gmail.com
 
-### Google Drive (File Storage)
+### Google Drive
 - **Path:** G:\My Drive\Super Grand Master\
 - **Purpose:** Working directory, synced to cloud
 
-### Google Cloud (Service Account)
-- **Service Account:** firebase-adminsdk-fbsvc@super-grand-master.iam.gserviceaccount.com
-- **Key File:** super-grand-master-58dcb7db3f91.json (store securely, do NOT commit to git)
-- **Used for:** GitHub Actions auto-deploy authentication
+### Google Cloud Service Account
+- **Email:** firebase-adminsdk-fbsvc@super-grand-master.iam.gserviceaccount.com
+- **Key File:** super-grand-master-58dcb7db3f91.json (DO NOT commit to git)
+- **Used for:** GitHub Actions CI/CD authentication
+
+### Claude Connectors (linked)
+- ✅ GitHub Integration
+- ✅ Gmail
+- ✅ Google Drive
 
 ---
 
@@ -62,15 +78,18 @@ const FIREBASE_CONFIG = {
 
 ```
 G:\My Drive\Super Grand Master\
-├── index.html                    # Main app (single HTML file with everything)
-├── firebase.json                 # Firebase hosting config (includes "site" field)
-├── .firebaserc                   # Links to super-grand-master project
+├── index.html                              # Main app (everything in one file)
+├── firebase.json                           # Firebase hosting config
+├── .firebaserc                             # Firebase project link
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml            # GitHub Actions auto-deploy workflow
-├── add_responsive.js             # One-time script used to add responsive CSS
-├── PROJECT_MASTER.md             # This file
-└── .git/                         # Git version control
+│       └── deploy.yml                      # GitHub Actions auto-deploy
+├── add_responsive.js                       # One-time: added responsive CSS
+├── add_auth.js                             # One-time: auth attempt v1
+├── add_auth2.js                            # One-time: auth UI v2 (successful)
+├── super-grand-master-58dcb7db3f91.json    # Service account key (KEEP SECRET)
+├── PROJECT_MASTER.md                       # This file
+└── .git/                                   # Git version control
 ```
 
 ---
@@ -79,25 +98,22 @@ G:\My Drive\Super Grand Master\
 
 | Component | Technology | Details |
 |-----------|-----------|---------|
-| Frontend | Single HTML file | Vanilla JS, no framework needed yet |
-| Chess Logic | chess.js v0.10.3 | Loaded from CDN |
-| Piece Images | Lichess SVGs | Loaded from lichess1.org/assets/ |
+| Frontend | Single HTML file | Vanilla JS, no framework |
+| Chess Logic | chess.js v0.10.3 | CDN |
+| Piece Images | Lichess SVGs | lichess1.org/assets/ |
 | Board Colors | Lichess exact | Light #f0d9b5, Dark #b58863 |
-| AI Engine | Custom minimax | Alpha-beta pruning + piece-square tables, 4 levels |
-| Database | Firebase Realtime DB | Singapore region, test mode |
-| Hosting | Firebase Hosting | Free tier, CDN-backed, SSL |
+| AI Engine | Custom minimax | Alpha-beta pruning, 4 levels |
+| Auth | Firebase Auth | Google + Email/Password |
+| Database | Firebase Realtime DB | Singapore |
+| Hosting | Firebase Hosting | Free tier, SSL, CDN |
 | Version Control | Git + GitHub | github.com/Ranjithvsk/super-grand-master |
-| File Backup | Google Drive | G:\My Drive\Super Grand Master\ |
-| CI/CD | GitHub Actions | Auto-deploy on every push to main |
-| Auth (CI) | Google Service Account | firebase-adminsdk, stored as GitHub Secret |
+| CI/CD | GitHub Actions | Auto-deploy on push to main |
+| CI Auth | Google Service Account | Stored in GitHub Secrets |
 
 ---
 
-## 5. GITHUB ACTIONS — AUTO DEPLOY
+## 5. GITHUB ACTIONS WORKFLOW
 
-Every `git push` to `main` automatically deploys to Firebase Hosting.
-
-### Workflow file: `.github/workflows/deploy.yml`
 ```yaml
 name: Deploy to Firebase Hosting
 on:
@@ -118,28 +134,25 @@ jobs:
       - run: firebase deploy --only hosting --project super-grand-master
 ```
 
-### GitHub Secrets configured:
-- `FIREBASE_SERVICE_ACCOUNT` — full JSON content of service account key
-- `FIREBASE_TOKEN` — (legacy, no longer used)
+**GitHub Secrets:**
+- `FIREBASE_SERVICE_ACCOUNT` — service account JSON ✅
+- `FIREBASE_TOKEN` — legacy, not used
 
 ---
 
 ## 6. DAILY DEVELOPMENT WORKFLOW
 
-```bash
-# Navigate to project
+```cmd
 cd /d "G:\My Drive\Super Grand Master"
-
-# Make your changes to index.html...
-
-# Push to GitHub (auto-deploys in ~30 seconds)
 git add .
 git commit -m "describe your change"
-git push
+git push origin HEAD:main
 ```
 
-> **Note:** Local branch is `master` but remote is `main`. Always use `git push origin HEAD:main` if plain `git push` fails. To fix permanently run:
-> ```
+Deploys automatically in ~35 seconds after push.
+
+> **Tip:** To make `git push` work without `origin HEAD:main`, run once:
+> ```cmd
 > git branch -m master main
 > git branch --set-upstream-to=origin/main main
 > ```
@@ -161,7 +174,35 @@ git push
 
 ---
 
-## 8. LICHESS PIECE SVG URLS
+## 8. USER ROLES & AUTH
+
+### Admin (Super Admin)
+- **Email:** ranjith.vsk@gmail.com
+- **Sign-in:** Google Sign-In
+- **Badge:** Green "Admin" badge in nav bar
+
+### Normal Users
+- **Sign-in:** Email/Password or Google
+- **Example:** harinitharanjith — create via Sign Up on the app
+
+### Admin detection in code
+```javascript
+const ADMINS = ['ranjith.vsk@gmail.com'];
+const isAdmin = ADMINS.includes(user.email);
+```
+
+### User data saved to Firebase DB
+```
+users/{uid}/
+  email: "user@example.com"
+  name: "Display Name"
+  role: "admin" | "user"
+  lastLogin: "ISO timestamp"
+```
+
+---
+
+## 9. LICHESS PIECE SVG URLS
 
 ```javascript
 const PIECE_SVG = {
@@ -182,44 +223,27 @@ const PIECE_SVG = {
 
 ---
 
-## 9. LICHESS EXACT CSS COLORS
+## 10. LICHESS EXACT CSS COLORS
 
 ```css
-/* Body & Layout */
-body background: #161512
-sidebar background: #262421
-header background: #2b2825
-
-/* Board Squares */
-light square: #f0d9b5
-dark square: #b58863
-
-/* Last Move Highlight */
-light last-move: #cdd26a
-dark last-move: #aaa23b
-
-/* Selected Square */
-light selected: #819669
-dark selected: #646d40
-
-/* Move Hint Dots */
-dot color: rgba(20, 85, 30, 0.5)
-
-/* Check Highlight */
-radial-gradient(ellipse at center, rgba(255,0,0,0.9) 0%, rgba(231,0,0,0.65) 25%, rgba(169,0,0,0) 89%)
-
-/* Lichess Blue (buttons, links) */
-#3692e7
-
-/* Lichess Green (success, play button) */
-#629924
+body background:     #161512
+sidebar:             #262421
+header:              #2b2825
+light square:        #f0d9b5
+dark square:         #b58863
+light last-move:     #cdd26a
+dark last-move:      #aaa23b
+light selected:      #819669
+dark selected:       #646d40
+hint dots:           rgba(20, 85, 30, 0.5)
+check:               radial-gradient(ellipse, rgba(255,0,0,.9) 0%, rgba(169,0,0,0) 89%)
+blue (buttons):      #3692e7
+green (play/admin):  #629924
 ```
 
 ---
 
-## 10. RESPONSIVE LAYOUT (Added April 17, 2026)
-
-The app is fully responsive across all screen sizes:
+## 11. RESPONSIVE LAYOUT
 
 | Screen | Breakpoint | Layout |
 |--------|-----------|--------|
@@ -227,152 +251,134 @@ The app is fully responsive across all screen sizes:
 | Tablet | ≤ 768px | 92vw board centered, sidebar below |
 | Desktop | > 768px | Side-by-side Lichess style |
 
-Key selectors for responsive CSS:
-- Board: `.puzzle__board .cg-wrap` and `#gcol .cg-wrap`
-- Sidebar: `.puzzle__side`
-- Play layout: `#gcol`
-- Stats: `.stats-grid`
+---
+
+## 12. PUZZLE DATABASE STATS
+
+- **Total:** 5,882,680 puzzles (CC0 license)
+- **Themes:** 74 unique
+- **Ratings:** 200–3,400
+- **Top themes:** fork 760K, pin 355K, backRankMate 199K, skewer 130K
+- **Top openings:** Sicilian 184K, French 78K, Caro-Kann 67K, Italian 67K
+- **Currently embedded:** 60 curated puzzles (beginner/intermediate/advanced)
 
 ---
 
-## 11. LICHESS PUZZLE DATABASE STATS
-
-From the uploaded file: lichess_db_puzzle_csv.zst (280MB compressed)
-
-- **Total puzzles:** 5,882,680
-- **74 unique themes**
-- **Rating range:** 200 to 3,400
-- **Top themes:** fork (760K), pin (355K), skewer (130K), backRankMate (199K)
-- **Top openings:** Sicilian (184K), French (78K), Caro-Kann (67K), Italian (67K)
-- **Peak rating bucket:** 1000-1200
-
-### Currently Embedded Puzzles
-- 60 curated puzzles across all themes and 3 difficulty levels (beginner/intermediate/advanced)
-
----
-
-## 12. DEVELOPMENT ROADMAP
+## 13. ROADMAP
 
 ### Phase 1 — MVP ✅ COMPLETE
-- [x] Firebase project created
-- [x] Web app registered with hosting
-- [x] Realtime Database created (Singapore)
-- [x] Lichess puzzle DB extracted (5.8M puzzles)
-- [x] Chess trainer with Lichess-style UI
+- [x] Firebase project + hosting + Realtime DB
+- [x] Lichess-style chess trainer UI
+- [x] 60 embedded puzzles
 - [x] Play vs engine (4 difficulty levels)
 - [x] Stats tracking (localStorage)
-- [x] Deployed to https://super-grand-master.web.app
-- [x] GitHub repo created
+- [x] Deployed live
 
 ### Phase 2 — Professional Setup ✅ COMPLETE
-- [x] GitHub repository: Ranjithvsk/super-grand-master
-- [x] Code pushed to GitHub from Google Drive
-- [x] GitHub Actions auto-deploy to Firebase (on every push)
-- [x] Firebase Service Account authentication
-- [x] Responsive layout for mobile, tablet, desktop
+- [x] GitHub repo + code pushed
+- [x] GitHub Actions auto-deploy (CI/CD)
+- [x] Firebase Service Account auth
+- [x] Fully responsive layout (mobile/tablet/desktop)
 - [x] GitHub connector linked to Claude
 
-### Phase 3 — Firebase Auth (NEXT)
-- [ ] Add Google sign-in (one-tap on mobile)
-- [ ] User accounts with separate progress
-- [ ] Sync progress across devices via Realtime DB
+### Phase 3 — Firebase Auth 🔄 IN PROGRESS
+- [x] Google + Email/Password auth enabled in Firebase Console
+- [x] Firebase SDK added to index.html
+- [x] Login overlay UI (sign in/up + Google button)
+- [x] Admin role detection + badge
+- [x] User data saved to Realtime DB
+- [ ] Fix browser cache (hard refresh Ctrl+Shift+R after deploy)
+- [ ] Create Harinitharanjith's account via Sign Up
+- [ ] Per-user puzzle progress synced to DB
 - [ ] User profile page
 
 ### Phase 4 — Full Database
-- [ ] Move full 5.8M puzzles to Firebase Firestore
-- [ ] Server-side puzzle filtering by theme/rating
-- [ ] Spaced repetition (wrong puzzles come back)
+- [ ] 5.8M puzzles in Firebase Firestore
+- [ ] Server-side filtering by theme/rating
+- [ ] Spaced repetition system
 - [ ] Daily puzzle challenge
 
 ### Phase 5 — Social Features
 - [ ] Leaderboard
-- [ ] Rating system (Elo-based)
+- [ ] Elo-based rating system
 - [ ] Daily/weekly challenges
-- [ ] Share puzzles with friends
+- [ ] Share puzzles
 
 ---
 
-## 13. HOW TO CONTINUE IN A NEW CHAT
+## 14. KNOWN ISSUES & FIXES
 
-Copy-paste this to Claude in a new conversation:
+| Issue | Fix |
+|-------|-----|
+| Auth overlay not showing | Hard refresh: `Ctrl+Shift+R` on the site |
+| Push rejected (non-fast-forward) | `git pull origin main --rebase` then `git push origin HEAD:main` |
+| Vim opens during rebase | Press `Esc` then `:wq` then `Enter` |
+| `git push` fails (branch mismatch) | `git push origin HEAD:main` |
+| Firebase deploy: no site name error | Ensure `firebase.json` has `"site": "super-grand-master"` |
+| Firebase 401 auth error in Actions | Use Service Account not login:ci token |
+
+---
+
+## 15. HOW TO START A NEW CHAT
 
 ```
-I'm continuing development of my chess training app "Super Grand Master".
+I'm continuing development of "Super Grand Master" chess app.
 
-Live URL: https://super-grand-master.web.app
+Live: https://super-grand-master.web.app
 GitHub: https://github.com/Ranjithvsk/super-grand-master
-Firebase project: super-grand-master (Spark plan)
-Database: Realtime DB in Singapore
-Working directory: G:\My Drive\Super Grand Master\
-Account: ranjith.vsk@gmail.com / GitHub: Ranjithvsk
+Firebase: super-grand-master (Spark plan, Singapore DB)
+Working dir: G:\My Drive\Super Grand Master\
+Account: ranjith.vsk@gmail.com | GitHub: Ranjithvsk
 
-Current state:
-- Phase 1 (MVP) and Phase 2 (CI/CD) are complete
-- Single HTML file with Lichess-style UI
-- 60 embedded puzzles, chess engine with 4 levels
-- Uses actual Lichess SVG pieces and exact color scheme
-- Firebase Hosting + Realtime DB configured
-- GitHub Actions auto-deploy working (uses Service Account)
-- Fully responsive: mobile, tablet, desktop
+Status:
+- Phase 1 ✅ MVP complete
+- Phase 2 ✅ CI/CD complete (auto-deploy on git push)
+- Phase 3 🔄 Firebase Auth in progress
+  - Google + Email/Password enabled
+  - Login overlay UI added
+  - Admin: ranjith.vsk@gmail.com
+  - Cache fix pending
+- Single HTML file, Lichess-style UI
+- 60 puzzles, 4-level chess engine
+- Responsive: mobile/tablet/desktop
 
-I have the full PROJECT_MASTER.md with all credentials,
-SVG URLs, CSS colors, and architecture details.
-
-I want to work on: [DESCRIBE WHAT YOU WANT TO DO NEXT]
+I want to work on: [DESCRIBE WHAT YOU WANT]
 ```
 
 ---
 
-## 14. IMPORTANT NOTES
+## 16. IMPORTANT NOTES
 
-1. **Firebase test mode expires** — Database rules allow read/write for 30 days from April 17, 2026. Update rules before **May 17, 2026**.
-
-2. **Service account key** — `super-grand-master-58dcb7db3f91.json` is stored locally. Do NOT commit this to git. It's already in GitHub Secrets as `FIREBASE_SERVICE_ACCOUNT`.
-
-3. **Lichess SVG URLs may change** — They use content hashes. If pieces stop loading, re-extract URLs from lichess.org.
-
-4. **Free tier limits** — Firebase Spark plan: 10GB bandwidth/month, 1GB storage, 1GB Realtime DB.
-
-5. **Puzzle data is CC0** — Lichess releases under Creative Commons Zero. Free for any use including commercial.
-
-6. **chess.js version** — Using v0.10.3 from CDN. Methods: .move(), .undo(), .moves(), .board(), .fen(), .turn(), .in_check(), .in_checkmate(), .game_over()
-
-7. **Git branch** — Local branch is `master`, remote is `main`. Use `git push origin HEAD:main` until you run the rename commands above.
+1. **DB rules expire May 17, 2026** — update Firebase rules before then
+2. **Service account JSON** — never commit, stored in GitHub Secrets
+3. **Lichess SVG URLs** — use content hashes, may change if Lichess updates
+4. **Free tier** — 10GB bandwidth/month, 1GB storage, 1GB Realtime DB
+5. **Puzzle data** — CC0 license, free for any use
+6. **chess.js v0.10.3** — `.move()` `.undo()` `.moves()` `.fen()` `.turn()` `.in_check()` `.in_checkmate()` `.game_over()`
+7. **Cache** — always `Ctrl+Shift+R` after deploying to see new version
 
 ---
 
-## 15. KEY PYTHON SCRIPTS (for puzzle extraction)
+## 17. PUZZLE EXTRACTION SCRIPT
 
-### Extract puzzles from Lichess DB
 ```python
-import zstandard as zstd
-import io, json, random
+import zstandard as zstd, io
 
 dctx = zstd.ZstdDecompressor()
-
 with open('lichess_db_puzzle_csv.zst', 'rb') as f:
     reader = dctx.stream_reader(f)
     text_stream = io.TextIOWrapper(reader, encoding='utf-8')
     next(text_stream)  # skip header
-
     for line in text_stream:
         parts = line.strip().split(',')
         if len(parts) < 9: continue
-        # parts: [id, fen, moves, rating, ratingDev, popularity, nbPlays, themes, gameUrl, openingTags]
-        puzzle_id = parts[0]
-        fen = parts[1]
-        moves = parts[2]
-        rating = int(parts[3])
-        themes = parts[7]
+        puzzle_id, fen, moves, rating, themes = parts[0], parts[1], parts[2], int(parts[3]), parts[7]
+        # FEN = position BEFORE opponent's move
+        # Moves[0] = opponent move, Moves[1:] = solution
+        # Player moves at index 1, 3, 5...
 ```
 
-### Puzzle CSV format
+**CSV format:**
 ```
 PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags
 ```
-
-### Puzzle solving logic
-- FEN = position BEFORE opponent's move
-- Moves[0] = opponent's move (apply to get puzzle position)
-- Moves[1:] = solution (player + opponent alternating)
-- Player must find moves at index 1, 3, 5, ...
