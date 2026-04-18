@@ -5761,7 +5761,7 @@ function doPzMove(fr,to,pr){
       else showPrompt('turn');
       drawPuzzle();
     },400);
-  }else{st.a++;st.k=0;saveSt();applyPuzzleResult(false);showPrompt('fail');sel=null;drawPuzzle()}
+  } // wrong moves handled by Chessground callback
 }
 function showPrompt(type){
   const el=document.getElementById('prompt');
