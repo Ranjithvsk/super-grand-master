@@ -5505,9 +5505,11 @@ function getFilteredPuzzles(){
     pool=pool.filter(p=>{
       const allMoves=p[2].split(' ');
       const playerMoves=Math.ceil((allMoves.length-1)/2);
-      return playerMoves===n;
+      return n>=4 ? playerMoves>=4 : playerMoves===n;
     });
   }
+  return pool.length>0?pool:PUZZLES;
+}
   return pool.length>0?pool:PUZZLES;
 }
 function updateFilterCount(){
@@ -6082,6 +6084,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776509622 -->
+<!-- sgm:1776509723 -->
 </body>
 </html>
