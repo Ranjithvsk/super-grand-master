@@ -5767,9 +5767,9 @@ function drawPuzzle() {
       } else {
         // Wrong move - show error and reset board
         st.a++; st.k=0; saveSt();
-        pzFailed=true; pzWrongCount++;
+        if(!pzFailed){pzFailed=true;try{applyWrongMove();}catch(e){console.warn('[SGM]',e.message);}}
+        pzWrongCount++;
         showPrompt('fail');
-        try{applyWrongMove();}catch(e){console.warn('[SGM]',e.message);}
         // Reset board visuals only (keeps 'That's not it' visible)
         setTimeout(() => {
           if(cgPuzzle && curPz){
@@ -5819,12 +5819,12 @@ function doPzMove(fr,to,pr){
   const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
   if(uci===exp){
     chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
-    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(!pzFailed);}catch(e){console.warn('[SGM]',e.message);}drawPuzzle();return}
+    if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');if(!pzFailed){try{applyPuzzleResult(true);}catch(e){console.warn('[SGM]',e.message);}}drawPuzzle();return}
     showPrompt('good');drawPuzzle();
     setTimeout(()=>{
       const op=curPz.sol[pzIdx];chess.move({from:op.slice(0,2),to:op.slice(2,4),promotion:op.length>4?op[4]:undefined});
       lastMv={from:op.slice(0,2),to:op.slice(2,4)};pzIdx++;
-      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(!pzFailed);}catch(e){console.warn('[SGM]',e.message);}}
+      if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');if(!pzFailed){try{applyPuzzleResult(true);}catch(e){console.warn('[SGM]',e.message);}}}
       else setTimeout(()=>showPrompt('turn'),600);
       drawPuzzle();
     },400);
@@ -6093,6 +6093,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776504415 -->
+<!-- sgm:1776505025 -->
 </body>
 </html>
