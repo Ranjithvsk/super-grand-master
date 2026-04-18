@@ -5624,7 +5624,7 @@ const G2 = {
 let myGlicko = { rating: G2.INIT_RATING, rd: G2.INIT_RD, vol: G2.INIT_VOL };
 
 function loadGlicko(uid) {
-  firebase.database().ref('users/' + uid + '/glicko').once('value').then(snap => {
+  firebase.database().ref('users/' + uid + '/glicko').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap => {
     const d = snap.val();
     if (d) { myGlicko = { rating: d.r || G2.INIT_RATING, rd: d.rd || G2.INIT_RD, vol: d.vol || G2.INIT_VOL }; }
     updNavElo();
@@ -5672,7 +5672,7 @@ function updLeaderboard() {
   tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">Loading...</td></tr>';
   const user = firebase.auth().currentUser;
   if (yourEl && user) yourEl.textContent = G2.display(myGlicko.rating, myGlicko.rd);
-  firebase.database().ref('users').once('value').then(snap => {
+  firebase.database().ref('users').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap => {
     const users = [];
     snap.forEach(child => {
       const d = child.val();
@@ -5895,7 +5895,7 @@ function updProfile(){
   roleEl.className='profile-role '+(isAdmin?'admin':'user');
   if(u.photoURL){document.getElementById('pav').innerHTML='<img src="'+u.photoURL+'" alt="avatar"/>';}
   // Load stats from Firebase
-  firebase.database().ref('users/'+u.uid+'/stats').once('value').then(snap=>{
+  firebase.database().ref('users/'+u.uid+'/stats').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
     const d=snap.val();
     if(d){
       // Merge Firebase stats with local (take max of each)
@@ -5918,7 +5918,7 @@ function updProfile(){
     document.getElementById('psync').textContent='Showing local stats';
   });
   // Load join date
-  firebase.database().ref('users/'+u.uid+'/lastLogin').once('value').then(snap=>{
+  firebase.database().ref('users/'+u.uid+'/lastLogin').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
     const d=snap.val();
     if(d) document.getElementById('pjoined').textContent='Last login: '+new Date(d).toLocaleDateString();
   });
@@ -5926,6 +5926,7 @@ function updProfile(){
 
 // Wait for Chessground then start
 function startApp() {
+  if(window._sgmStarted)return;window._sgmStarted=true;
   newPuzzle();
   ['f-theme','f-diff','f-moves'].forEach(function(id){
     var el=document.getElementById(id);
@@ -5936,7 +5937,7 @@ function startApp() {
 if (window._cgReady) {
   startApp();
 } else {
-  document.addEventListener('chessground-ready', startApp);
+  document.addEventListener('cgready', startApp);
   // Fallback timeout in case module loading is slow
   setTimeout(function() { if (!window._cgReady) startApp(); }, 2000);
 }
@@ -5945,9 +5946,6 @@ if (window._cgReady) {
   const el=document.getElementById(id);
   if(el) el.addEventListener('change',()=>{updateFilterCount();if(window.Chessground){newPuzzle();});
 });
-updateFilterCount();}else{document.addEventListener('cgready',function(){newPuzzle();});
-});
-updateFilterCount();},{once:true});}
 </script>
 
 <div id="auth-overlay">
@@ -6032,9 +6030,9 @@ updateFilterCount();},{once:true});}
         name:user.displayName||user.email.split('@')[0],
         role:isAdmin?'admin':'user',
         lastLogin:new Date().toISOString()
-      });
+      }).catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);});
       // Load stats from Firebase and merge with local
-      db.ref('users/'+user.uid+'/stats').once('value').then(snap=>{
+      db.ref('users/'+user.uid+'/stats').once('value').catch(function(e){if(e&&e.code)console.warn('[SGM] DB:',e.code);}).then(snap=>{
         const d=snap.val();
         if(d){
           st.s=Math.max(st.s,d.s||0);st.a=Math.max(st.a,d.a||0);
@@ -6055,6 +6053,7 @@ updateFilterCount();},{once:true});}
 <!-- sgm-ts:1776495351 -->
 
 
-<!-- sgm:1776496545 -->
+
+<!-- sgm:1776498806 -->
 </body>
 </html>
