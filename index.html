@@ -5651,9 +5651,8 @@ function applyPuzzleResult(solved) {
   const user = firebase.auth().currentUser;
   if (!user || !curPz) return;
   const result = G2.update(myGlicko, curPz.rating, 50, solved ? 1 : 0);
-  const rawDelta = result.rating - myGlicko.rating;
-  const delta = solved ? Math.min(rawDelta, 30) : Math.max(rawDelta, -30);
-  myGlicko = { rating: myGlicko.rating + delta, rd: result.rd, vol: result.vol };
+  const delta = Math.round(result.rating - myGlicko.rating);
+  myGlicko = result;
   saveGlicko(user.uid);
   updNavElo();
   // Show rating change feedback
@@ -6074,6 +6073,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776508514 -->
+<!-- sgm:1776508843 -->
 </body>
 </html>
