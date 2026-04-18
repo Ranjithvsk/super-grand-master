@@ -5714,12 +5714,13 @@ function drawPuzzle() {
       var _col = (typeof curPz !== 'undefined' && curPz && curPz.color === 'b') ? 'black' : 'white';
       _pr.className = 'puzzle__feedback';
       _pr.innerHTML =
-        '<div class="icon"><svg viewBox="0 0 40 40" style="width:40px;height:40px;opacity:.6"><text y="32" font-size="36">&#9812;</text></svg></div>' +
-        '<div class="result">Your turn</div>' +
-        '<div class="instruction">Find the best move for ' + _col + '.</div>' +
-        '<div class="actions">' +
+        '<div class="icon" style="font-size:36px;opacity:.6;margin-bottom:8px">&#9812;</div>' +
+      '<div class="result">Your turn</div>' +
+      '<div class="instruction">Find the best move for ' + _col + '.</div>' +
+      '<div class="actions">' +
         '<a onclick="pzHint()">GET A HINT</a>' +
         '<a onclick="pzSolution()">VIEW THE SOLUTION</a>' +
+      '</div>' +
         '</div>';
     }
     if (_ml) { _ml.innerHTML = ''; }
@@ -5734,11 +5735,13 @@ function drawPuzzle() {
       var _col = (typeof curPz !== 'undefined' && curPz && curPz.color === 'b') ? 'black' : 'white';
       _pr.className = 'puzzle__feedback';
       _pr.innerHTML =
-        '<div class="icon">&#9812;</div>' +
-        '<p class="result">Your turn</p>' +
-        '<p class="instruction">Find the best move for ' + _col + '.</p>' +
-        '<a  onclick="pzHint()">GET A HINT</a>' +
-        '<a   onclick="pzSolution()">VIEW THE SOLUTION</a>';
+        '<div class="icon" style="font-size:36px;opacity:.6;margin-bottom:8px">&#9812;</div>' +
+      '<div class="result">Your turn</div>' +
+      '<div class="instruction">Find the best move for ' + _col + '.</div>' +
+      '<div class="actions">' +
+        '<a onclick="pzHint()">GET A HINT</a>' +
+        '<a onclick="pzSolution()">VIEW THE SOLUTION</a>' +
+      '</div>';
     }
     if (_ml) { _ml.innerHTML = ''; }
   })();
@@ -6084,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776527680 -->
+<!-- sgm:1776528033 -->
 
 <script id="fst-engine">
 (function(){
