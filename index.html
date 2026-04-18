@@ -6,7 +6,12 @@
 <title>Super Grand Master — Chess Trainer</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-<script src="https://unpkg.com/@lichess-org/chessground@10.1.1/dist/chessground.min.js"></script>
+<script type="module">
+import { Chessground } from 'https://unpkg.com/@lichess-org/chessground@10.1.1/dist/chessground.js';
+window.Chessground = Chessground;
+window._cgReady = true;
+document.dispatchEvent(new Event('chessground-ready'));
+</script>
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.base.css">
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.brown.css">
 <link rel="stylesheet" href="https://unpkg.com/@lichess-org/chessground@10.1.1/assets/chessground.cburnett.css">
@@ -5446,7 +5451,8 @@ function getCheckSq(ch) {
 function initCG(id, onMove) {
   const el = document.getElementById(id);
   if (!el) return null;
-  return Chessground(el, {
+  if (!window.Chessground) { console.error('Chessground not ready'); return null; }
+  return window.Chessground(el, {
     coordinates: true,
     animation: { enabled: true, duration: 150 },
     movable: { free: false, color: undefined, events: { after: onMove } },
@@ -5869,7 +5875,22 @@ function updProfile(){
   });
 }
 
-newPuzzle();
+// Wait for Chessground then start
+function startApp() {
+  newPuzzle();
+  ['f-theme','f-diff','f-moves'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('change',function(){updFC();newPuzzle();});
+  });
+  updFC();
+}
+if (window._cgReady) {
+  startApp();
+} else {
+  document.addEventListener('chessground-ready', startApp);
+  // Fallback timeout in case module loading is slow
+  setTimeout(function() { if (!window._cgReady) startApp(); }, 2000);
+}
 // Wire filter controls
 ['f-theme','f-diff','f-moves'].forEach(id=>{
   const el=document.getElementById(id);
