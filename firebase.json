@@ -1,8 +1,21 @@
 {
-    "hosting": {
-          "site": "super-grand-master",
-          "public": ".",
-          "ignore": ["firebase.json","**/.*"],
-          "headers": [{"source":"**","headers":[{"key":"Cache-Control","value":"public, max-age=3600"}]}]
-    }
+  "hosting": {
+    "site": "super-grand-master",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ]
+  }
 }
