@@ -5727,10 +5727,6 @@ function onPzSq(sq){
   }else{const pc=chess.get(sq);if(pc&&pc.color===chess.turn())sel=sq;drawPuzzle()}
 }
 function doPzMove(fr,to,pr){
-  // Check for promotion
-  const mvs=chess.moves({square:fr,verbose:true});
-  const mv=mvs.find(x=>x.to===to);
-  if(mv&&mv.flags.includes('p')&&!pr){showPromo(fr,to,chess.turn(),'pz');return;}
   const exp=curPz.sol[pzIdx],uci=fr+to+(pr||'');
   if(uci===exp){
     chess.move({from:fr,to:to,promotion:pr});lastMv={from:fr,to:to};sel=null;pzIdx++;
