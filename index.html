@@ -139,7 +139,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 .play-btn:hover{background:#72b328}
 .g-status{text-align:center;padding:12px;font-size:16px;font-weight:600;color:#ccc;background:#262421;border-radius:4px;margin-bottom:12px}
 .g-board-wrap{display:flex;justify-content:center}
-.g-board{width:min(calc(100vh - 200px),520px);aspect-ratio:1;display:grid;grid-template-columns:repeat(8,12.5%);grid-template-rows:repeat(8,12.5%);border-radius:4px;overflow:hidden;user-select:none}
+.g-board{width:min(calc(100vh - 280px),min(520px,calc(100vw - 40px)));aspect-ratio:1;display:grid;grid-template-columns:repeat(8,12.5%);grid-template-rows:repeat(8,12.5%);border-radius:4px;overflow:hidden;user-select:none}
 .g-moves{margin-top:12px;padding:12px;background:#262421;border-radius:4px;font-family:monospace;font-size:13px;color:#999;min-height:50px;max-height:120px;overflow-y:auto;line-height:1.8}
 
 /* STATS VIEW */
@@ -5748,8 +5748,20 @@ function drawPuzzle() {
         st.a++; st.k=0; saveSt();
         showPrompt('fail');
         try{applyPuzzleResult(false);}catch(e){console.warn('[SGM]',e.message);}
-        // Reset board to correct position
-        setTimeout(() => drawPuzzle(), 100);
+        // Reset board visuals only (keeps 'That's not it' visible)
+        setTimeout(() => {
+          if(cgPuzzle && curPz){
+            const _pc=curPz.color==='w'?'white':'black';
+            cgPuzzle.set({
+              fen:chess.fen(),
+              orientation:flipped?'black':'white',
+              turnColor:_pc,
+              movable:{free:false,color:_pc,dests:groundDests(chess),showDests:true},
+              lastMove:lastMv?[lastMv.from,lastMv.to]:undefined,
+              check:getCheckSq(chess)||false
+            });
+          }
+        }, 100);
       }
     });
   }
@@ -5791,7 +5803,7 @@ function doPzMove(fr,to,pr){
       const op=curPz.sol[pzIdx];chess.move({from:op.slice(0,2),to:op.slice(2,4),promotion:op.length>4?op[4]:undefined});
       lastMv={from:op.slice(0,2),to:op.slice(2,4)};pzIdx++;
       if(pzIdx>=curPz.sol.length){pzDone=true;st.s++;st.a++;st.k++;saveSt();showPrompt('success');try{applyPuzzleResult(true);}catch(e){console.warn('[SGM]',e.message);}}
-      else showPrompt('turn');
+      else setTimeout(()=>showPrompt('turn'),600);
       drawPuzzle();
     },400);
   } // wrong moves handled by Chessground callback
@@ -6059,6 +6071,6 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776500224 -->
+<!-- sgm:1776502901 -->
 </body>
 </html>
