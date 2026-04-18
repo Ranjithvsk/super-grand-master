@@ -151,6 +151,16 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 #user-badge .abadge{background:#629924;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;text-transform:uppercase}
 #btn-out{padding:5px 10px;background:none;border:1px solid #3a3632;border-radius:3px;color:#999;font-size:12px;cursor:pointer;font-family:inherit}
 #btn-out:hover{background:#302e2b;color:#fff}
+
+/* PUZZLE FILTER BAR */
+#filter-bar{background:#1e1c1a;border-bottom:1px solid #2e2b28;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#filter-bar label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px;font-weight:600;white-space:nowrap}
+#filter-bar select{padding:5px 8px;background:#302e2b;color:#bababa;border:1px solid #3a3632;border-radius:3px;font-size:13px;font-family:inherit;cursor:pointer}
+#filter-bar select:focus{outline:none;border-color:#629924}
+#filter-bar .filter-sep{width:1px;height:20px;background:#2e2b28;margin:0 2px}
+#filter-count{font-size:12px;color:#555;margin-left:auto;white-space:nowrap}
+#filter-count span{color:#629924;font-weight:700}
+
 /* PROFILE VIEW */
 .profile-page{max-width:480px;margin:0 auto;padding:30px 12px}
 .profile-section{text-align:center;margin-bottom:24px}
@@ -190,6 +200,71 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
     <a onclick="switchView('profile')">PROFILE</a>
   </div>
 </header>
+
+<!-- FILTER BAR -->
+<div id="filter-bar">
+  <label>Theme</label>
+  <select id="f-theme">
+    <option value="">All Themes</option>
+    <optgroup label="Tactics">
+      <option value="fork">Fork (714)</option>
+      <option value="pin">Pin (333)</option>
+      <option value="skewer">Skewer (122)</option>
+      <option value="discoveredAttack">Discovered Attack (265)</option>
+      <option value="deflection">Deflection (261)</option>
+      <option value="attraction">Attraction (232)</option>
+      <option value="sacrifice">Sacrifice (388)</option>
+      <option value="clearance">Clearance (62)</option>
+      <option value="intermezzo">Intermezzo (77)</option>
+      <option value="hangingPiece">Hanging Piece (195)</option>
+      <option value="trappedPiece">Trapped Piece (68)</option>
+      <option value="defensiveMove">Defensive Move (219)</option>
+      <option value="quietMove">Quiet Move (131)</option>
+    </optgroup>
+    <optgroup label="Mate Patterns">
+      <option value="mateIn1">Mate in 1 (519)</option>
+      <option value="mateIn2">Mate in 2 (654)</option>
+      <option value="mateIn3">Mate in 3 (200)</option>
+      <option value="backRankMate">Back Rank Mate (86)</option>
+      <option value="exposedKing">Exposed King (136)</option>
+      <option value="kingsideAttack">Kingside Attack (415)</option>
+      <option value="queensideAttack">Queenside Attack (64)</option>
+    </optgroup>
+    <optgroup label="Endgame">
+      <option value="rookEndgame">Rook Endgame (230)</option>
+      <option value="pawnEndgame">Pawn Endgame (137)</option>
+      <option value="queenEndgame">Queen Endgame (68)</option>
+      <option value="bishopEndgame">Bishop Endgame (65)</option>
+      <option value="advancedPawn">Advanced Pawn (292)</option>
+      <option value="promotion">Promotion (123)</option>
+    </optgroup>
+    <optgroup label="Phase">
+      <option value="opening">Opening (277)</option>
+      <option value="middlegame">Middlegame (2329)</option>
+      <option value="endgame">Endgame (2394)</option>
+    </optgroup>
+  </select>
+  <div class="filter-sep"></div>
+  <label>Difficulty</label>
+  <select id="f-diff">
+    <option value="">All</option>
+    <option value="beginner">Beginner (900-1199)</option>
+    <option value="intermediate">Intermediate (1200-1499)</option>
+    <option value="advanced">Advanced (1500-1799)</option>
+    <option value="expert">Expert (1800-2000)</option>
+  </select>
+  <div class="filter-sep"></div>
+  <label>Moves</label>
+  <select id="f-moves">
+    <option value="">Any</option>
+    <option value="1">1 Move (523)</option>
+    <option value="2">2 Moves (2851)</option>
+    <option value="3">3 Moves (1381)</option>
+    <option value="4">4 Moves (196)</option>
+    <option value="5">5 Moves (41)</option>
+  </select>
+  <div id="filter-count"><span id="fc-num">5,000</span> puzzles</div>
+</div>
 
 <!-- PUZZLE VIEW -->
 <div class="puzzle" id="v-puzzles">
@@ -5324,8 +5399,32 @@ function drawBoard(id,ch,fl,canMove,onClick){
 function findKing(ch,col){const b=ch.board();for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(p&&p.type==='k'&&p.color===col)return 'abcdefgh'[c]+(8-r)}return null}
 
 // === PUZZLES ===
+function getFilteredPuzzles(){
+  const theme=document.getElementById('f-theme')?.value||'';
+  const diff=document.getElementById('f-diff')?.value||'';
+  const moves=document.getElementById('f-moves')?.value||'';
+  const DIFF_RANGES={beginner:[900,1199],intermediate:[1200,1499],advanced:[1500,1799],expert:[1800,2000]};
+  let pool=PUZZLES;
+  if(theme) pool=pool.filter(p=>p[4].split(' ').includes(theme));
+  if(diff){const [lo,hi]=DIFF_RANGES[diff];pool=pool.filter(p=>p[3]>=lo&&p[3]<=hi);}
+  if(moves){
+    const n=parseInt(moves);
+    pool=pool.filter(p=>{
+      const allMoves=p[2].split(' ');
+      const playerMoves=Math.ceil((allMoves.length-1)/2);
+      return playerMoves===n;
+    });
+  }
+  return pool.length>0?pool:PUZZLES;
+}
+function updateFilterCount(){
+  const pool=getFilteredPuzzles();
+  const el=document.getElementById('fc-num');
+  if(el) el.textContent=pool.length.toLocaleString();
+}
 function newPuzzle(){
-  const raw=PUZZLES[Math.floor(Math.random()*PUZZLES.length)];
+  const pool=getFilteredPuzzles();
+  const raw=pool[Math.floor(Math.random()*pool.length)];
   const sCh=new Chess(raw[1]);
   const moves=raw[2].split(' ');
   const om=moves[0];
@@ -5467,6 +5566,12 @@ function updProfile(){
 }
 
 newPuzzle();
+// Wire filter controls
+['f-theme','f-diff','f-moves'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('change',()=>{updateFilterCount();newPuzzle();});
+});
+updateFilterCount();
 </script>
 
 <div id="auth-overlay">
