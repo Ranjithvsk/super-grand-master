@@ -5680,14 +5680,14 @@ function newPuzzle(){
     /* pool fast path */
     var _pool = window.FST.pool || [];
     for(var _i=0;_i<_pool.length;_i++){
-      if((_pool[_i].t||[]).indexOf(_thIdx)>-1){
+      if((_pool[_i][4]||"").split(" ").indexOf(_th)>-1){
         var _p=_pool.splice(_i,1)[0];
         try{
-          var _fen=_p.f+" - 0 1";
-          var _thm=(_p.t||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ");
-          var _ch=new Chess(_fen);var _mv=_p.m.split(" ");
+          var _fen=_p[1];
+          var _thm=_p[4]||"";
+          var _ch=new Chess(_fen);var _mv=_p[2].split(" ");
           _ch.move({from:_mv[0].slice(0,2),to:_mv[0].slice(2,4),promotion:_mv[0][4]||"q"});
-          curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_p.r,themes:_thm,id:_p.i};
+          curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_p[3],themes:_thm,id:_p[0]};
           _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
         }catch(e){}
         return;
@@ -6409,7 +6409,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776601326 -->
+<!-- sgm:1776604311 -->
 
 <script id="fst-engine">
 (function(){
