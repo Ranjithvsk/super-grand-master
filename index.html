@@ -6087,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776578691 -->
+<!-- sgm:1776579222 -->
 
 <script id="fst-engine">
 (function(){
@@ -6530,35 +6530,40 @@ window.addEventListener('load', function(){
 
 
 
-<script>
-/* SGM theme filter v4 — installs AFTER FST engine (timing fix) */
-window.addEventListener('load', function() {
-  /* Wait 3s — FST engine finishes at ~2s (500ms delay + pool fetch + installOverride) */
-  setTimeout(function() {
-    var _origNP = window.newPuzzle; // wrap whatever is set now (fstNewPuzzle)
-    window.FST = window.FST || {};
-    window.FST.themeFilter = window.FST.themeFilter || '';
 
-    /* ── Load raw puzzle array into curPz and draw ── */
-    function _loadRaw(raw) {
-      try {
-        var ch = new Chess(raw[1]);
-        var mv = raw[2].split(' ');
-        ch.move({from:mv[0].slice(0,2), to:mv[0].slice(2,4), promotion:mv[0][4]||'q'});
-        window.curPz = {fen:ch.fen(), sol:mv.slice(1), color:ch.turn(),
-                        rating:raw[3], themes:raw[4]||'', id:raw[0]};
-        window._pzShowingSolution = false;
-        window.drawPuzzle();
-        var idEl = document.querySelector('a[href*="lichess.org/training"]');
-        if(idEl){idEl.href='https://lichess.org/training/'+raw[0]; idEl.textContent='#'+raw[0];}
-        document.querySelectorAll('.puzzle__info *').forEach(function(el){
-          if(!el.children.length && el.textContent.trim().match(/^\d{3,4}$/)) el.textContent=raw[3];
-        });
-      } catch(e) { console.warn('[v4] loadRaw:',e.message); _origNP(); }
+
+
+<script>
+/* SGM theme filter v5 — pool-plant method, installs after FST engine */
+window.addEventListener('load', function() {
+  setTimeout(function() {
+
+    window.FST = window.FST || {};
+    window.FST.themeFilter = '';
+
+    /* Save the FST engine's newPuzzle as _origNP */
+    var _origNP = window._fstOrigNewPuzzle || window.newPuzzle;
+
+    /* ── Plant raw puzzle at front of pool, then call _origNP ── */
+    function _plantAndLoad(raw) {
+      window.FST.pool = window.FST.pool || [];
+      /* Remove any existing entry for this ID to avoid duplicates */
+      window.FST.pool = window.FST.pool.filter(function(p){ return p[0] !== raw[0]; });
+      /* Plant at position 0 — _origNP will pop it first */
+      window.FST.pool.unshift(raw);
+      /* Call FST engine's newPuzzle which has closure access to cg */
+      _origNP();
     }
 
-    /* ── Fetch Firestore chunks to find a specific puzzle ID ── */
-    function _fetchById(targetId, fallbackTheme, fallbackIds) {
+    /* ── Fetch Firestore chunks to find a raw puzzle by ID ── */
+    function _fetchAndPlant(targetId, theme, allIds, attempt) {
+      attempt = attempt || 0;
+      if(attempt > 3) {
+        /* Give up — just load any random puzzle */
+        _origNP();
+        return;
+      }
+
       var userRating = 1500;
       try { if(window.myGlicko&&window.myGlicko.rating) userRating=Math.round(window.myGlicko.rating); } catch(e){}
       var band = Math.floor(Math.max(300,Math.min(3200,userRating))/100)*100;
@@ -6566,35 +6571,57 @@ window.addEventListener('load', function() {
       var db = window.FST.db || firebase.firestore();
       window.FST.db = db;
 
-      // Try 6 random chunks across ±2 rating bands
-      var bands = [band,band-100,band+100,band-200,band+200,band+300].filter(function(b){return b>=300&&b<=3200;});
-      var found=false, tried=0;
+      /* Try 4 chunks — 2 near user rating, 2 random bands */
+      var allBands = [band, band-100, band+100, band+200, band-200, band+300]
+        .filter(function(b){ return b>=300&&b<=3200; });
+      var bands = allBands.slice(0, 4);
+
+      var found = false, tried = 0;
+      var fetching = bands.length;
 
       bands.forEach(function(b) {
-        var idx = String(Math.floor(Math.random()*200)).padStart(4,'0');
-        db.collection('puzzle_paths').doc(b+'_'+idx).get().then(function(snap) {
+        var idx = String(Math.floor(Math.random() * 200)).padStart(4, '0');
+        db.collection('puzzle_paths').doc(b + '_' + idx).get().then(function(snap) {
           if(found) { tried++; return; }
           if(snap.exists) {
-            (snap.data().puzzles||[]).forEach(function(p) {
+            var puzzles = snap.data().puzzles || [];
+            puzzles.forEach(function(p) {
+              /* Decode compact or raw format */
               var raw = Array.isArray(p) ? p :
-                [p.i, p.f+' - 0 1', p.m, p.r, (p.t||[]).map(function(i){return T[i]||'';}).filter(Boolean).join(' ')];
-              window.FST.pool.push(raw);
-              if(!found && raw[0]===targetId) { found=true; _loadRaw(raw); }
+                [p.i, p.f + ' - 0 1', p.m, p.r,
+                 (p.t || []).map(function(i){ return T[i]||''; }).filter(Boolean).join(' ')];
+              /* Cache in pool */
+              if(!window.FST.pool.some(function(x){ return x[0]===raw[0]; })) {
+                window.FST.pool.push(raw);
+              }
+              /* Found our target! */
+              if(!found && raw[0] === targetId) {
+                found = true;
+                _plantAndLoad(raw);
+              }
             });
           }
           tried++;
-          if(tried>=bands.length && !found) {
-            // Fallback: find any puzzle with this theme in pool
-            var pool = window.FST.pool||[];
-            var th = fallbackTheme;
-            for(var i=0;i<pool.length;i++) {
-              if((pool[i][4]||'').includes(th)){ found=true; _loadRaw(pool.splice(i,1)[0]); break; }
+          if(tried >= fetching && !found) {
+            /* Not found in these chunks — try another random ID from RTDB index */
+            if(allIds && allIds.length > 0) {
+              var nextId = allIds[Math.floor(Math.random() * allIds.length)];
+              /* Check pool first */
+              var poolMatch = window.FST.pool.find(function(p){ return p[0]===nextId; });
+              if(poolMatch) { found=true; _plantAndLoad(poolMatch); }
+              else _fetchAndPlant(nextId, theme, allIds, attempt + 1);
+            } else {
+              /* Last resort: find any pool puzzle with this theme */
+              var themeMatch = window.FST.pool.find(function(p){
+                return (p[4]||'').includes(theme);
+              });
+              if(themeMatch) { found=true; _plantAndLoad(themeMatch); }
+              else _origNP();
             }
-            if(!found) _origNP();
           }
         }).catch(function() {
           tried++;
-          if(tried>=bands.length && !found) _origNP();
+          if(tried >= fetching && !found) _origNP();
         });
       });
     }
@@ -6604,40 +6631,48 @@ window.addEventListener('load', function() {
       var theme = window.FST.themeFilter || '';
       if(!theme) { return _origNP.apply(this, arguments); }
 
-      // Show loading state
+      /* Show loading state */
       var pr = document.getElementById('prompt');
-      if(pr) pr.innerHTML = '<div class="result" style="color:#aaa;font-size:15px">Loading ' +
-        theme.replace(/([A-Z])/g,' $1').trim() + ' puzzles\u2026</div>';
+      if(pr) pr.innerHTML =
+        '<div class="result" style="color:#aaa;font-size:14px">Loading ' +
+        theme.replace(/([A-Z])/g,' $1').trim() + '\u2026</div>';
 
-      firebase.database().ref('/themes/'+theme).once('value').then(function(snap) {
+      /* Read RTDB theme index */
+      firebase.database().ref('/themes/' + theme).once('value').then(function(snap) {
         var data = snap.val();
-        if(!data || !data.ids || !data.ids.length) { _origNP(); return; }
-        var ids = data.ids;
-        var targetId = ids[Math.floor(Math.random()*ids.length)];
-        console.log('[v4]', theme, '->', targetId, '('+ids.length+' in index)');
-
-        // Check pool first
-        var pool = window.FST.pool||[];
-        for(var i=0;i<pool.length;i++) {
-          if(pool[i][0]===targetId){ _loadRaw(pool.splice(i,1)[0]); return; }
+        if(!data || !data.ids || !data.ids.length) {
+          console.warn('[v5] no RTDB index for:', theme);
+          _origNP(); return;
         }
-        // Fetch from Firestore
-        _fetchById(targetId, theme, ids);
+
+        var ids = data.ids;
+        var targetId = ids[Math.floor(Math.random() * ids.length)];
+        console.log('[v5]', theme, '->', targetId, '('+ids.length+' IDs in index)');
+
+        /* Check pool first — O(n) but pool is small */
+        var poolMatch = (window.FST.pool||[]).find(function(p){ return p[0]===targetId; });
+        if(poolMatch) {
+          _plantAndLoad(poolMatch);
+        } else {
+          /* Fetch from Firestore */
+          _fetchAndPlant(targetId, theme, ids, 0);
+        }
       }).catch(function(e) {
-        console.warn('[v4] RTDB err:',e.message);
+        console.warn('[v5] RTDB read error:', e.message);
         _origNP();
       });
     };
 
-    /* ── Wire theme select ── */
+    /* ── Wire theme dropdown ── */
     var sel = document.getElementById('theme-select') || document.querySelector('select');
     if(sel) {
       sel.onchange = function() {
         window.FST.themeFilter = sel.value || '';
         window.newPuzzle();
       };
-      console.log('[v4] theme filter wired — RTDB index active');
     }
+
+    console.log('[SGM v5] theme filter ready — pool-plant method');
   }, 3000);
 });
 </script>
