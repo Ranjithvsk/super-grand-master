@@ -6087,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776588001 -->
+<!-- sgm:1776591090 -->
 
 <script id="fst-engine">
 (function(){
@@ -6263,10 +6263,10 @@ function installOverride(){
   /* Update puzzle count display */
   var countEl = document.querySelector('.pz-count, [class*="puzzle-count"]');
   if(!countEl){
-    /* Find element showing "5,000 puzzles" */
+    /* Find element showing "1,470,658 puzzles" */
     var allEls = document.querySelectorAll('*');
     for(var i=0;i<allEls.length;i++){
-      if(allEls[i].children.length===0 && allEls[i].textContent.includes('5,000 puzzles')){
+      if(allEls[i].children.length===0 && allEls[i].textContent.includes('1,470,658 puzzles')){
         allEls[i].textContent='1,470,658 puzzles'; break;
       }
     }
@@ -6554,162 +6554,106 @@ window.addEventListener('load', function(){
 
 
 
-<script>
-/* SGM theme filter v11 -- theme_puzzles collection, 1 read guaranteed */
-(function() {
 
-  /*  Helpers  */
+
+
+<script>
+/* SGM theme filter v10 */
+(function() {
+  var BAND_MAX = {
+    300:200,400:200,500:200,600:400,700:400,800:600,
+    900:900,1000:900,1100:900,1200:860,1300:900,
+    1400:860,1500:860,1600:800,1700:600,1800:600,
+    1900:600,2000:600,2100:400,2200:400,2300:200
+  };
   function uBand() {
     var r = 1500;
     try { if(window.myGlicko&&window.myGlicko.rating) r=Math.round(window.myGlicko.rating); } catch(e){}
     return Math.floor(Math.max(300,Math.min(3200,r))/100)*100;
   }
-
-  /*  Get chunk count from RTDB theme_index  */
-  var _chunkCache = {};  /* {theme_band: count} */
-  function getChunkCount(theme, band, cb) {
-    var key = theme + '_' + band;
-    if(_chunkCache[key] !== undefined) { cb(_chunkCache[key]); return; }
-    firebase.database().ref('/theme_index/' + theme + '/' + band)
-      .once('value')
-      .then(function(s) {
-        var count = s.val() || 0;
-        _chunkCache[key] = count;
-        cb(count);
-      })
-      .catch(function() { cb(0); });
+  function decode(p) {
+    var T = window.FST_THEMES || [];
+    if(Array.isArray(p)) return p;
+    return [p.i, p.f+" - 0 1", p.m, p.r,
+            (p.t||[]).map(function(i){return T[i]||"";}).filter(Boolean).join(" ")];
   }
-
-  /*  Load a puzzle from theme_puzzles collection  */
-  function loadThemeChunk(theme, band, chunkIdx, origNP) {
-    var db = window.FST.db || firebase.firestore();
-    window.FST.db = db;
-    var docId = theme + '_' + band + '_' + String(chunkIdx).padStart(3, '0');
-    db.collection('theme_puzzles').doc(docId).get().then(function(snap) {
-      if(!snap.exists) { origNP(); return; }
-      var puzzles = snap.data().puzzles || [];
-      if(!puzzles.length) { origNP(); return; }
-      /* All puzzles in this doc match the theme -- pick random one */
-      var p = puzzles[Math.floor(Math.random() * puzzles.length)];
-      /* Cache in pool */
-      puzzles.forEach(function(px) {
-        var raw = [px.i, px.f, px.m, px.r, px.t];
-        if(!(window.FST.pool||[]).some(function(x){return x[0]===px.i;}))
-          (window.FST.pool=window.FST.pool||[]).push(raw);
-      });
-      /* Load the selected puzzle */
-      loadRaw([p.i, p.f, p.m, p.r, p.t], origNP);
-    }).catch(function(e) {
-      console.warn('[v11] fetch error:', e.message);
-      origNP();
-    });
-  }
-
-  /*  Find best band with chunks available  */
-  function findBandAndLoad(theme, origNP) {
-    var band = uBand();
-    var bands = [band, band-100, band+100, band-200, band+200,
-                 band-300, band+300, band+400, band-400]
-      .filter(function(b){ return b>=300&&b<=3200; });
-
-    function tryBand(i) {
-      if(i >= bands.length) { origNP(); return; }
-      var b = bands[i];
-      getChunkCount(theme, b, function(count) {
-        if(!count) { tryBand(i+1); return; }
-        var idx = Math.floor(Math.random() * count);
-        loadThemeChunk(theme, b, idx, function() { tryBand(i+1); });
-      });
-    }
-    tryBand(0);
-  }
-
-  /*  Build curPz from raw and render board  */
   function loadRaw(raw, origNP) {
     try {
       var ch = new Chess(raw[1]);
-      var mv = raw[2].split(' ');
-      ch.move({from:mv[0].slice(0,2), to:mv[0].slice(2,4), promotion:mv[0][4]||'q'});
-      window.curPz = {
-        fen:    ch.fen(),
-        sol:    mv.slice(1),
-        color:  ch.turn(),
-        rating: raw[3],
-        themes: raw[4] || '',
-        id:     raw[0]
-      };
+      var mv = raw[2].split(" ");
+      ch.move({from:mv[0].slice(0,2), to:mv[0].slice(2,4), promotion:mv[0][4]||"q"});
+      window.curPz = {fen:ch.fen(), sol:mv.slice(1), color:ch.turn(),
+                      rating:raw[3], themes:raw[4]||"", id:raw[0]};
       window._pzShowingSolution = false;
       window.drawPuzzle();
-      /* Update info panel */
-      var el = document.querySelector('a[href*="lichess.org/training"]');
-      if(el){ el.href='https://lichess.org/training/'+raw[0]; el.textContent='#'+raw[0]; }
-      document.querySelectorAll('.puzzle__info *').forEach(function(el){
-        if(!el.children.length && el.textContent.trim().match(/^\d{3,4}$/))
+      var el = document.querySelector("a[href*="lichess.org/training"]");
+      if(el){ el.href="https://lichess.org/training/"+raw[0]; el.textContent="#"+raw[0]; }
+      document.querySelectorAll(".puzzle__info *").forEach(function(el){
+        if(!el.children.length && el.textContent.trim().match(/^[0-9]{3,4}$/))
           el.textContent = raw[3];
       });
-      console.log('[v11] loaded', raw[0], (raw[4]||'').substring(0,40));
-    } catch(e) {
-      console.warn('[v11] loadRaw err:', e.message);
-      if(origNP) origNP();
-    }
+    } catch(e) { if(origNP) origNP(); }
   }
-
-  /*  Install theme-aware newPuzzle  */
+  function fetchDoc(docId, theme, origNP, onFound, onMiss) {
+    var db = window.FST.db || firebase.firestore();
+    window.FST.db = db;
+    db.collection("puzzle_paths").doc(docId).get().then(function(snap) {
+      if(!snap.exists) { onMiss(); return; }
+      var match = null;
+      (snap.data().puzzles||[]).forEach(function(p) {
+        var raw = decode(p);
+        if(!(window.FST.pool||[]).some(function(x){return x[0]===raw[0];})) (window.FST.pool=window.FST.pool||[]).push(raw);
+        if(!match && (raw[4]||"").split(" ").indexOf(theme) > -1) match = raw;
+      });
+      if(match) onFound(match); else onMiss();
+    }).catch(function() { onMiss(); });
+  }
+  function loadTheme(theme, origNP) {
+    var band = uBand();
+    var bands = [band,band-100,band+100,band-200,band+200,band-300,band+300,band-400].filter(function(b){return b>=300&&b<=3200;});
+    function tryBand(i) {
+      if(i >= bands.length) {
+        var mx = BAND_MAX[band]||860;
+        var doc = band+"_"+String(Math.floor(Math.random()*mx)).padStart(4,"0");
+        fetchDoc(doc, theme, origNP, function(raw){ loadRaw(raw, origNP); }, origNP);
+        return;
+      }
+      firebase.database().ref("/theme_docs/"+theme+"/"+bands[i]).once("value").then(function(snap) {
+        var docs = snap.val();
+        if(!docs||!docs.length) { tryBand(i+1); return; }
+        var docId = docs[Math.floor(Math.random()*docs.length)];
+        fetchDoc(docId, theme, origNP, function(raw){ loadRaw(raw,origNP); }, function(){ tryBand(i+1); });
+      }).catch(function() { tryBand(i+1); });
+    }
+    tryBand(0);
+  }
   function install() {
     window.FST = window.FST || {};
-    window.FST.themeFilter = window.FST.themeFilter || '';
+    window.FST.themeFilter = window.FST.themeFilter || "";
     var origNP = window._fstOrigNewPuzzle || window.newPuzzle;
-
     window.newPuzzle = function() {
-      var theme = window.FST.themeFilter || '';
+      var theme = window.FST.themeFilter || "";
       if(!theme) { return origNP.apply(this, arguments); }
-
-      /* Pool fast path */
       var pool = window.FST.pool || [];
       for(var i=0; i<pool.length; i++) {
-        if((pool[i][4]||'').split(' ').indexOf(theme) > -1) {
-          loadRaw(pool.splice(i, 1)[0], origNP);
-          return;
-        }
+        if((pool[i][4]||"").split(" ").indexOf(theme) > -1) { loadRaw(pool.splice(i,1)[0], origNP); return; }
       }
-
-      /* Show loading */
-      var pr = document.getElementById('prompt');
-      if(pr) pr.innerHTML = '<div class="result" style="color:#aaa;font-size:14px">Loading '+
-        theme.replace(/([A-Z])/g,' $1').trim()+'...</div>';
-
-      /* Load from theme_puzzles collection */
-      findBandAndLoad(theme, origNP);
+      var pr = document.getElementById("prompt");
+      if(pr) pr.innerHTML = "<div class="result" style="color:#aaa;font-size:14px">Loading "+theme.replace(/([A-Z])/g," $1").trim()+"...</div>";
+      loadTheme(theme, origNP);
     };
-
-    /* Wire dropdown */
-    var sel = document.getElementById('theme-select') || document.querySelector('select');
-    if(sel) sel.onchange = function() {
-      window.FST.themeFilter = sel.value || '';
-      window.newPuzzle();
-    };
-
-    console.log('[SGM v11] theme_puzzles engine ready');
+    var sel = document.getElementById("theme-select") || document.querySelector("select");
+    if(sel) sel.onchange = function() { window.FST.themeFilter = sel.value || ""; window.newPuzzle(); };
+    console.log("[SGM v10] installed");
   }
-
-  /*  Poll until FST engine sets _fstOrigNewPuzzle  */
-  var _attempts = 0;
+  var _att = 0;
   function poll() {
-    _attempts++;
-    if(window._fstOrigNewPuzzle) {
-      install();
-    } else if(_attempts < 150) {
-      setTimeout(poll, 100);
-    } else {
-      install(); /* timeout fallback */
-    }
+    _att++;
+    if(window._fstOrigNewPuzzle) { install(); return; }
+    if(_att < 150) { setTimeout(poll, 100); } else { install(); }
   }
-
-  if(document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', poll);
-  } else {
-    poll();
-  }
+  if(document.readyState === "loading") { document.addEventListener("DOMContentLoaded", poll); }
+  else { poll(); }
 })();
 </script>
 
