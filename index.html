@@ -240,24 +240,7 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script><script type="module">
-/* SGM_TC_MOD_V5 */
-import{getFirestore,doc,getDoc,collection}from'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-function tryInit(){
-  try{
-    var app=firebase.app()._delegate;
-    var db=getFirestore(app,'sgm-puzzles');
-    window._sgmTcGetDoc=function(c,d){return getDoc(doc(collection(db,c),d));};
-    window._sgmTcReady=true;
-  }catch(e){
-    window._sgmTcReady=false;
-    window._sgmTcError=e.message;
-  }
-}
-if(typeof firebase!=="undefined"&&firebase.apps&&firebase.apps.length){tryInit();}
-else{document.addEventListener("DOMContentLoaded",tryInit);}
-</script>
-</head>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script></head>
 <body>
 
 <!-- TOP NAV -->
@@ -6426,7 +6409,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776612768 -->
+<!-- sgm:1776614602 -->
 
 <script id="fst-engine">
 (function(){
@@ -6897,7 +6880,7 @@ window.addEventListener('load', function(){
 
 
 <script>
-/* SGM theme filter v13 - sgm-puzzles Enterprise + Lichess prefetch */
+/* SGM theme filter v14 - tc collection, compat SDK, Lichess prefetch */
 (function() {
   function uBand(){
     var r=1500;
@@ -6905,40 +6888,41 @@ window.addEventListener('load', function(){
     return Math.floor(Math.max(300,Math.min(3200,r))/100)*100;
   }
   function padZ(n,l){var s=String(n);while(s.length<l)s="0"+s;return s;}
+
   function addToPool(pzs){
     if(!window.FST)return;
     var T=window.FST_THEMES||[];
     var pool=window.FST.pool=window.FST.pool||[];
-    for(var i=pzs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pzs[i];pzs[i]=pzs[j];pzs[j]=t;}
+    for(var i=pzs.length-1;i>0;i--){
+      var j=Math.floor(Math.random()*(i+1));var t=pzs[i];pzs[i]=pzs[j];pzs[j]=t;
+    }
     pzs.forEach(function(p){
       var th=(p.t||[]).map(function(i){return T[i]||"";}).filter(Boolean).join(" ");
       var a=[p.i,p.f+" - 0 1",p.m,p.r,th];
       if(!pool.some(function(x){return x[0]===a[0];}))pool.push(a);
     });
   }
-  /* Read from sgm-puzzles (modular) with (default) fallback */
-  function tcGet(docId,cb){
-    if(window._sgmTcReady&&window._sgmTcGetDoc){
-      window._sgmTcGetDoc("tc",docId).then(cb).catch(function(){
-        if(window.FST&&window.FST.db)window.FST.db.collection("tc").doc(docId).get().then(cb).catch(function(){cb(null);});
-        else cb(null);
-      });
-    }else if(window.FST&&window.FST.db){
-      window.FST.db.collection("tc").doc(docId).get().then(cb).catch(function(){cb(null);});
-    }else{cb(null);}
-  }
+
   function fetchChunk(theme,band,n,bg){
+    if(!window.FST||!window.FST.db){if(!bg)setTimeout(function(){fetchChunk(theme,band,n,bg);},300);return;}
     var ci=Math.floor(Math.random()*n);
     var id=theme+"_"+padZ(band,4)+"_"+padZ(ci,4);
-    tcGet(id,function(snap){if(snap&&snap.exists)addToPool(snap.data().puzzles||[]);if(!bg)newPuzzle();});
+    window.FST.db.collection("tc").doc(id).get()
+      .then(function(snap){
+        if(snap&&snap.exists)addToPool(snap.data().puzzles||[]);
+        if(!bg)newPuzzle();
+      }).catch(function(){if(!bg)newPuzzle();});
   }
+
   function bgFetch(theme,band){
     firebase.database().ref("/tc_idx/"+theme+"/"+band).once("value")
       .then(function(s){var n=s.val();if(n&&n>0)fetchChunk(theme,band,n,true);})
       .catch(function(){});
   }
+
   function loadTheme(theme){
     if(!window.FST||!window.FST.db){setTimeout(function(){loadTheme(theme);},300);return;}
+    /* pool fast path */
     var pool=window.FST.pool||[];
     for(var i=0;i<pool.length;i++){
       if((pool[i][4]||"").split(" ").indexOf(theme)>-1){
@@ -6948,18 +6932,21 @@ window.addEventListener('load', function(){
           ch.move({from:mv[0].slice(0,2),to:mv[0].slice(2,4),promotion:mv[0][4]||"q"});
           curPz={fen:ch.fen(),sol:mv.slice(1),color:ch.turn(),rating:p[3],themes:p[4],id:p[0]};
           _pzShowingSolution=false;chess.load(curPz.fen);drawPuzzle();
+          /* Lichess-style: background prefetch when pool runs low */
           var rem=(window.FST.pool||[]).filter(function(x){return(x[4]||"").split(" ").indexOf(theme)>-1;}).length;
           if(rem<10){var b=uBand();setTimeout(function(){bgFetch(theme,b);},50);}
         }catch(e){}
         return;
       }
     }
+    /* pool miss - show loading, fetch now */
     var pr=document.getElementById("prompt");
     if(pr)pr.innerHTML="<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading...</div>";
     var band=uBand();
     firebase.database().ref("/tc_idx/"+theme+"/"+band).once("value").then(function(s){
       var n=s.val();
       if(!n||n<1){
+        /* find nearest band */
         firebase.database().ref("/tc_idx/"+theme).once("value").then(function(s2){
           var all=s2.val();
           if(!all){newPuzzle();return;}
@@ -6971,6 +6958,8 @@ window.addEventListener('load', function(){
       fetchChunk(theme,band,n,false);
     }).catch(function(){newPuzzle();});
   }
+
+  /* Wire dropdown */
   window.addEventListener("load",function(){
     var sel=document.getElementById("theme-select")||document.querySelector("select");
     if(!sel)return;
@@ -6981,6 +6970,7 @@ window.addEventListener('load', function(){
     });
     if(sel.value&&window.FST){window.FST.themeFilter=sel.value;loadTheme(sel.value);}
   });
+
 })();
 </script>
 
