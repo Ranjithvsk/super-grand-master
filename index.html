@@ -6087,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776584833 -->
+<!-- sgm:1776584984 -->
 
 <script id="fst-engine">
 (function(){
@@ -6548,10 +6548,20 @@ window.addEventListener('load', function(){
 
 
 
+
+
+
 <script>
 /* SGM theme filter v9 -- direct curPz + drawPuzzle, RTDB doc-pointer */
-window.addEventListener('load', function() {
-  setTimeout(function() {
+(function() {  // run immediately or on load
+  var _v9_attempts = 0;
+  function _v9_init() {
+    _v9_attempts++;
+    // Wait for FST engine to finish installOverride (sets window._fstOrigNewPuzzle)
+    if(!window._fstOrigNewPuzzle && _v9_attempts < 60) {
+      setTimeout(_v9_init, 200); return;
+    }
+    (function() {
     window.FST = window.FST || {};
     window.FST.themeFilter = '';
     var T = window.FST_THEMES || [];
@@ -6670,8 +6680,15 @@ window.addEventListener('load', function() {
       };
     }
     console.log('[SGM v9] ready');
-  }, 3000);
-});
+    })();
+  }
+  // Run now if page already loaded, otherwise wait
+  if(document.readyState === 'complete') {
+    _v9_init();
+  } else {
+    window.addEventListener('load', _v9_init);
+  }
+})();
 </script>
 
 </body>
