@@ -240,7 +240,23 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script></head>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script><script type="module">
+/* SGM_TC_MOD */
+import{getApp}from'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import{getFirestore,doc,getDoc}from'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+window.addEventListener("load",function(){
+  try{
+    var _db=getFirestore(getApp(),'sgm-puzzles');
+    window._sgmTcGetDoc=function(colName,docId){
+      return getDoc(doc(_db,colName,docId));
+    };
+    window._sgmTcReady=true;
+  }catch(e){
+    window._sgmTcReady=false;
+  }
+});
+</script>
+</head>
 <body>
 
 <!-- TOP NAV -->
@@ -6409,7 +6425,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776604311 -->
+<!-- sgm:1776611866 -->
 
 <script id="fst-engine">
 (function(){
@@ -6880,104 +6896,131 @@ window.addEventListener('load', function(){
 
 
 <script>
-/* SGM theme filter v10 */
+/* SGM theme filter v12 - sgm-puzzles Enterprise DB */
 (function() {
-  var BAND_MAX = {
-    300:200,400:200,500:200,600:400,700:400,800:600,
-    900:900,1000:900,1100:900,1200:860,1300:900,
-    1400:860,1500:860,1600:800,1700:600,1800:600,
-    1900:600,2000:600,2100:400,2200:400,2300:200
-  };
+  /* 1 RTDB read (chunk count) + 1 Firestore read (64 puzzles) = done */
+  /* All puzzles in tc doc are guaranteed to have the selected theme */
+
   function uBand() {
     var r = 1500;
     try { if(window.myGlicko&&window.myGlicko.rating) r=Math.round(window.myGlicko.rating); } catch(e){}
     return Math.floor(Math.max(300,Math.min(3200,r))/100)*100;
   }
-  function decode(p) {
+
+  function padZ(n,len) { var s=String(n); while(s.length<len) s="0"+s; return s; }
+
+  function addToPool(pzs) {
     var T = window.FST_THEMES || [];
-    if(Array.isArray(p)) return p;
-    return [p.i, p.f+" - 0 1", p.m, p.r,
-            (p.t||[]).map(function(i){return T[i]||"";}).filter(Boolean).join(" ")];
+    var pool = window.FST.pool = window.FST.pool || [];
+    for(var i=pzs.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1)); var t=pzs[i]; pzs[i]=pzs[j]; pzs[j]=t; }
+    pzs.forEach(function(p) {
+      var thStr = (p.t||[]).map(function(i){return T[i]||"";}).filter(Boolean).join(" ");
+      var arr = [p.i, p.f+" - 0 1", p.m, p.r, thStr];
+      if(!pool.some(function(x){return x[0]===arr[0];})) pool.push(arr);
+    });
   }
-  function loadRaw(raw, origNP) {
-    try {
-      var ch = new Chess(raw[1]);
-      var mv = raw[2].split(" ");
-      ch.move({from:mv[0].slice(0,2), to:mv[0].slice(2,4), promotion:mv[0][4]||"q"});
-      window.curPz = {fen:ch.fen(), sol:mv.slice(1), color:ch.turn(),
-                      rating:raw[3], themes:raw[4]||"", id:raw[0]};
-      window._pzShowingSolution = false;
-      window.drawPuzzle();
-      var el = document.querySelector("a[href*="lichess.org/training"]");
-      if(el){ el.href="https://lichess.org/training/"+raw[0]; el.textContent="#"+raw[0]; }
-      document.querySelectorAll(".puzzle__info *").forEach(function(el){
-        if(!el.children.length && el.textContent.trim().match(/^[0-9]{3,4}$/))
-          el.textContent = raw[3];
-      });
-    } catch(e) { if(origNP) origNP(); }
+
+  function fetchChunk(theme, band, nChunks, bgPrefetch) {
+    var ci = Math.floor(Math.random()*nChunks);
+    var docId = theme+"_"+padZ(band,4)+"_"+padZ(ci,4);
+    /* Use sgm-puzzles (modular SDK) with (default) fallback */
+    var getDocFn = window._sgmTcGetDoc || function(c,d) { return window.FST.db.collection(c).doc(d).get(); };
+    getDocFn("tc", docId).then(function(snap) {
+      if(!snap.exists) { if(!bgPrefetch) newPuzzle(); return; }
+      addToPool(snap.data().puzzles || []);
+      if(!bgPrefetch) newPuzzle();
+    }).catch(function() {
+      /* fallback to (default) if sgm-puzzles fails */
+      if(window._sgmTcGetDoc && window.FST && window.FST.db) {
+        window.FST.db.collection("tc").doc(docId).get().then(function(snap2) {
+          if(snap2.exists) addToPool(snap2.data().puzzles || []);
+          if(!bgPrefetch) newPuzzle();
+        }).catch(function() { if(!bgPrefetch) newPuzzle(); });
+      } else { if(!bgPrefetch) newPuzzle(); }
+    });
   }
-  function fetchDoc(docId, theme, origNP, onFound, onMiss) {
-    var db = window.FST.db || firebase.firestore();
-    window.FST.db = db;
-    db.collection("puzzle_paths").doc(docId).get().then(function(snap) {
-      if(!snap.exists) { onMiss(); return; }
-      var match = null;
-      (snap.data().puzzles||[]).forEach(function(p) {
-        var raw = decode(p);
-        if(!(window.FST.pool||[]).some(function(x){return x[0]===raw[0];})) (window.FST.pool=window.FST.pool||[]).push(raw);
-        if(!match && (raw[4]||"").split(" ").indexOf(theme) > -1) match = raw;
-      });
-      if(match) onFound(match); else onMiss();
-    }).catch(function() { onMiss(); });
-  }
-  function loadTheme(theme, origNP) {
+
+  function loadTheme(theme) {
+    if(!window.FST || !window.FST.db) { setTimeout(function(){loadTheme(theme);}, 200); return; }
     var band = uBand();
-    var bands = [band,band-100,band+100,band-200,band+200,band-300,band+300,band-400].filter(function(b){return b>=300&&b<=3200;});
-    function tryBand(i) {
-      if(i >= bands.length) {
-        var mx = BAND_MAX[band]||860;
-        var doc = band+"_"+String(Math.floor(Math.random()*mx)).padStart(4,"0");
-        fetchDoc(doc, theme, origNP, function(raw){ loadRaw(raw, origNP); }, origNP);
+    /* Check pool first */
+    var pool = window.FST.pool || [];
+    for(var i=0; i<pool.length; i++) {
+      if((pool[i][4]||"").split(" ").indexOf(theme) > -1) {
+        var p = pool.splice(i,1)[0];
+        try {
+          var ch = new Chess(p[1]); var mv = p[2].split(" ");
+          ch.move({from:mv[0].slice(0,2),to:mv[0].slice(2,4),promotion:mv[0][4]||"q"});
+          curPz={fen:ch.fen(),sol:mv.slice(1),color:ch.turn(),rating:p[3],themes:p[4],id:p[0]};
+          _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
+          /* Lichess-style: prefetch next chunk if pool low */
+          var remaining = pool.filter(function(x){return(x[4]||"").split(" ").indexOf(theme)>-1;}).length;
+          if(remaining < 10) setTimeout(function(){bgFetch(theme,band);}, 50);
+        } catch(e) {}
         return;
       }
-      firebase.database().ref("/theme_docs/"+theme+"/"+bands[i]).once("value").then(function(snap) {
-        var docs = snap.val();
-        if(!docs||!docs.length) { tryBand(i+1); return; }
-        var docId = docs[Math.floor(Math.random()*docs.length)];
-        fetchDoc(docId, theme, origNP, function(raw){ loadRaw(raw,origNP); }, function(){ tryBand(i+1); });
-      }).catch(function() { tryBand(i+1); });
     }
-    tryBand(0);
-  }
-  function install() {
-    window.FST = window.FST || {};
-    window.FST.themeFilter = window.FST.themeFilter || "";
-    var origNP = window._fstOrigNewPuzzle || window.newPuzzle;
-    window.newPuzzle = function() {
-      var theme = window.FST.themeFilter || "";
-      if(!theme) { return origNP.apply(this, arguments); }
-      var pool = window.FST.pool || [];
-      for(var i=0; i<pool.length; i++) {
-        if((pool[i][4]||"").split(" ").indexOf(theme) > -1) { loadRaw(pool.splice(i,1)[0], origNP); return; }
+    /* Pool miss - show loading, fetch now */
+    var pr = document.getElementById("prompt");
+    if(pr) pr.innerHTML = "<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading...</div>";
+    firebase.database().ref("/tc_idx/"+theme+"/"+band).once("value").then(function(s) {
+      var n = s.val();
+      if(!n || n < 1) {
+        /* find nearest band */
+        firebase.database().ref("/tc_idx/"+theme).once("value").then(function(s2) {
+          var all = s2.val();
+          if(!all) { newPuzzle(); return; }
+          var bands = Object.keys(all).map(Number).sort(function(a,b){return Math.abs(a-band)-Math.abs(b-band);});
+          fetchChunk(theme, bands[0], all[bands[0]], false);
+        }).catch(function(){ newPuzzle(); });
+        return;
       }
-      var pr = document.getElementById("prompt");
-      if(pr) pr.innerHTML = "<div class="result" style="color:#aaa;font-size:14px">Loading "+theme.replace(/([A-Z])/g," $1").trim()+"...</div>";
-      loadTheme(theme, origNP);
-    };
+      fetchChunk(theme, band, n, false);
+    }).catch(function(){ newPuzzle(); });
+  }
+
+  function bgFetch(theme, band) {
+    firebase.database().ref("/tc_idx/"+theme+"/"+band).once("value").then(function(s) {
+      var n = s.val();
+      if(n && n > 0) fetchChunk(theme, band, n, true);
+    }).catch(function(){});
+  }
+
+  /* Wire up theme dropdown */
+  window.addEventListener("load", function() {
     var sel = document.getElementById("theme-select") || document.querySelector("select");
-    if(sel) sel.onchange = function() { window.FST.themeFilter = sel.value || ""; window.newPuzzle(); };
-    console.log("[SGM v10] installed");
-  }
-  var _att = 0;
-  function poll() {
-    _att++;
-    if(window._fstOrigNewPuzzle) { install(); return; }
-    if(_att < 150) { setTimeout(poll, 100); } else { install(); }
-  }
-  if(document.readyState === "loading") { document.addEventListener("DOMContentLoaded", poll); }
-  else { poll(); }
+    if(!sel) return;
+    sel.addEventListener("change", function() {
+      var theme = sel.value;
+      if(window.FST) window.FST.themeFilter = theme;
+      if(theme) { loadTheme(theme); } else { newPuzzle(); }
+    });
+    /* Apply current selection if any */
+    if(sel.value && window.FST) {
+      window.FST.themeFilter = sel.value;
+      loadTheme(sel.value);
+    }
+  });
+
+  /* Override newPuzzle to intercept theme filter */
+  var _origNP = null;
+  Object.defineProperty(window, "newPuzzle", {
+    configurable: true,
+    get: function() { return _origNP; },
+    set: function(fn) {
+      _origNP = function() {
+        if(window.FST && window.FST.themeFilter) {
+          loadTheme(window.FST.themeFilter);
+        } else {
+          fn();
+        }
+      };
+    }
+  });
+
 })();
 </script>
+
 
 
 
