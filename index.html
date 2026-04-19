@@ -6087,7 +6087,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776579610 -->
+<!-- sgm:1776581215 -->
 
 <script id="fst-engine">
 (function(){
@@ -6536,103 +6536,142 @@ window.addEventListener('load', function(){
 
 
 
+
+
+
 <script>
-/* SGM theme filter v6 — chunk-filter method, installs after FST engine */
+/* SGM theme filter v8 — RTDB doc-pointer index, 2-read guaranteed */
 window.addEventListener('load', function() {
   setTimeout(function() {
     window.FST = window.FST || {};
     window.FST.themeFilter = '';
-
     var _origNP = window._fstOrigNewPuzzle || window.newPuzzle;
     var T = window.FST_THEMES || [];
 
-    /* ── Decode Firestore compact puzzle to raw array ── */
+    /* ── Band sizing (from Firestore probing) ── */
+    var BAND_MAX = {
+      300:200,400:200,500:200,600:400,700:400,
+      800:600,900:900,1000:900,1100:900,1200:860,
+      1300:900,1400:860,1500:860,1600:800,1700:600,
+      1800:600,1900:600,2000:600,2100:400,2200:400,
+      2300:200,2400:200,2500:200,2600:200,2700:100
+    };
+
+    function userBand() {
+      var r = 1500;
+      try { if(window.myGlicko&&window.myGlicko.rating) r=Math.round(window.myGlicko.rating); } catch(e){}
+      return Math.floor(Math.max(300,Math.min(3200,r))/100)*100;
+    }
+
     function decode(p) {
       if(Array.isArray(p)) return p;
       return [p.i, p.f+' - 0 1', p.m, p.r,
               (p.t||[]).map(function(i){return T[i]||'';}).filter(Boolean).join(' ')];
     }
 
-    /* ── Plant raw at pool[0] and call _origNP to render board ── */
     function plantAndLoad(raw) {
-      window.FST.pool = window.FST.pool || [];
-      window.FST.pool = window.FST.pool.filter(function(p){ return p[0]!==raw[0]; });
+      window.FST.pool = (window.FST.pool||[]).filter(function(p){return p[0]!==raw[0];});
       window.FST.pool.unshift(raw);
       _origNP();
     }
 
-    /* ── Fetch chunks and find puzzle matching theme ── */
-    function fetchChunksForTheme(theme, attempt) {
-      attempt = attempt || 0;
-      if(attempt >= 5) { _origNP(); return; } // give up after 5 rounds
-
-      var userRating = 1500;
-      try { if(window.myGlicko&&window.myGlicko.rating) userRating=Math.round(window.myGlicko.rating); } catch(e){}
-      var band = Math.floor(Math.max(300,Math.min(3200,userRating))/100)*100;
+    /* ── Fetch one Firestore doc and return first theme-matching puzzle ── */
+    function fetchDocForTheme(docId, theme, onFound, onMiss) {
       var db = window.FST.db || firebase.firestore();
       window.FST.db = db;
 
-      // Pick 3 random chunks, try across ±1 band for variety
-      var bands = [band, band-100, band+100].filter(function(b){return b>=300&&b<=3200;});
-      var chunks = [];
-      bands.forEach(function(b){
-        chunks.push(b+'_'+String(Math.floor(Math.random()*200)).padStart(4,'0'));
-      });
+      db.collection('puzzle_paths').doc(docId).get().then(function(snap) {
+        if(!snap.exists) { onMiss(); return; }
+        var puzzles = snap.data().puzzles || [];
+        var match = null;
 
-      var found = false, tried = 0;
-      chunks.forEach(function(docId) {
-        db.collection('puzzle_paths').doc(docId).get().then(function(snap) {
-          if(found) { tried++; return; }
-          if(snap.exists) {
-            var puzzles = snap.data().puzzles || [];
-            puzzles.forEach(function(p) {
-              var raw = decode(p);
-              // Cache in pool
-              if(!window.FST.pool.some(function(x){return x[0]===raw[0];})) {
-                window.FST.pool.push(raw);
-              }
-              // Check theme match
-              if(!found && (raw[4]||'').split(' ').indexOf(theme) > -1) {
-                found = true;
-                console.log('[v6]', theme, '-> found', raw[0], 'in', docId, '(attempt', attempt+1, ')');
-                plantAndLoad(raw);
-              }
-            });
+        puzzles.forEach(function(p) {
+          var raw = decode(p);
+          /* Cache everything in pool */
+          if(!(window.FST.pool||[]).some(function(x){return x[0]===raw[0];})) {
+            (window.FST.pool=window.FST.pool||[]).push(raw);
           }
-          tried++;
-          if(tried >= chunks.length && !found) {
-            // Not found in this round — fetch more chunks
-            fetchChunksForTheme(theme, attempt + 1);
+          /* Find theme match */
+          if(!match && (raw[4]||'').split(' ').indexOf(theme) > -1) {
+            match = raw;
           }
-        }).catch(function() {
-          tried++;
-          if(tried >= chunks.length && !found) fetchChunksForTheme(theme, attempt + 1);
         });
+
+        if(match) {
+          console.log('[v8]', theme, '->', match[0], 'in', docId);
+          onFound(match);
+        } else {
+          onMiss();
+        }
+      }).catch(function(e) {
+        console.warn('[v8] fetch error:', e.message);
+        onMiss();
       });
     }
 
-    /* ── Main theme-aware newPuzzle ── */
+    /* ── Main: load puzzle for theme using RTDB doc-pointer index ── */
+    function loadThemePuzzle(theme) {
+      var band  = userBand();
+      var rtdbTheme = theme || '_all_themes_';
+
+      /* Try current band first, then ±100 as fallback */
+      var bandsToTry = [band, band-100, band+100, band-200, band+200]
+        .filter(function(b){ return b>=300 && b<=3200; });
+
+      function tryBand(bandIdx) {
+        if(bandIdx >= bandsToTry.length) {
+          /* All RTDB bands exhausted — random chunk fallback */
+          console.warn('[v8] RTDB exhausted for', theme, '— random fallback');
+          var maxC = BAND_MAX[band] || 860;
+          var randDoc = band+'_'+String(Math.floor(Math.random()*maxC)).padStart(4,'0');
+          fetchDocForTheme(randDoc, theme, plantAndLoad, _origNP);
+          return;
+        }
+
+        var b = bandsToTry[bandIdx];
+        firebase.database().ref('/theme_docs/'+rtdbTheme+'/'+b).once('value')
+          .then(function(snap) {
+            var docs = snap.val();
+            if(!docs || !docs.length) { tryBand(bandIdx+1); return; }
+
+            /* Pick random doc from the list */
+            var docId = docs[Math.floor(Math.random()*docs.length)];
+
+            fetchDocForTheme(docId, theme||'', function(raw) {
+              plantAndLoad(raw);
+            }, function() {
+              /* Doc didn't have the theme (shouldn't happen, but retry) */
+              tryBand(bandIdx+1);
+            });
+          })
+          .catch(function() { tryBand(bandIdx+1); });
+      }
+
+      tryBand(0);
+    }
+
+    /* ── Override newPuzzle ── */
     window.newPuzzle = function() {
       var theme = window.FST.themeFilter || '';
       if(!theme) { return _origNP.apply(this, arguments); }
 
-      // Check existing pool first — fast path
+      /* Fast path: pool hit */
       var pool = window.FST.pool || [];
       for(var i=0; i<pool.length; i++) {
         if((pool[i][4]||'').split(' ').indexOf(theme) > -1) {
-          console.log('[v6]', theme, '-> pool hit:', pool[i][0]);
-          plantAndLoad(pool.splice(i, 1)[0]);
+          console.log('[v8] pool hit:', pool[i][0]);
+          plantAndLoad(pool.splice(i,1)[0]);
           return;
         }
       }
 
-      // Show loading state
+      /* Show loading */
       var pr = document.getElementById('prompt');
-      if(pr) pr.innerHTML = '<div class="result" style="color:#aaa;font-size:14px">Loading ' +
-        theme.replace(/([A-Z])/g,' $1').trim() + '\u2026</div>';
+      if(pr) pr.innerHTML = '<div class="result" style="color:#aaa;font-size:14px">Loading '+
+        theme.replace(/([A-Z])/g,' $1').trim()+'\u2026</div>';
 
-      // Fetch chunks and filter by theme
-      fetchChunksForTheme(theme, 0);
+      /* Use RTDB index */
+      loadThemePuzzle(theme);
     };
 
     /* ── Wire dropdown ── */
@@ -6643,7 +6682,7 @@ window.addEventListener('load', function() {
         window.newPuzzle();
       };
     }
-    console.log('[SGM v6] chunk-filter theme engine ready');
+    console.log('[SGM v8] doc-pointer theme engine ready');
   }, 3000);
 });
 </script>
