@@ -5673,6 +5673,77 @@ function newPuzzle(){
   /* SGM theme v10 */
   if(window.FST && window.FST.themeFilter) {
     var _th = window.FST.themeFilter;
+    var _T = window.FST_THEMES || [];
+    var _thIdx = _T.indexOf(_th);
+    var _db = window.FST.db;
+    if(!_db){setTimeout(newPuzzle,300);return;}
+    var _pool = window.FST.pool || [];
+    /* pool fast path */
+    for(var _i=0;_i<_pool.length;_i++){
+      var _p=_pool[_i];
+      var _pt=_p.t||(_p[4]?_p[4].split(" "):[]);
+      var _match=Array.isArray(_pt)?(_pt.indexOf(_thIdx)>-1):(_pt.indexOf(_th)>-1);
+      if(_match){
+        var _raw=_pool.splice(_i,1)[0];
+        var _fen=Array.isArray(_raw)?_raw[1]:(_raw.f+" - 0 1");
+        var _mvs=Array.isArray(_raw)?_raw[2]:_raw.m;
+        var _rat=Array.isArray(_raw)?_raw[3]:_raw.r;
+        var _thm=Array.isArray(_raw)?(_raw[4]||""):(_raw.t||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ");
+        var _id=Array.isArray(_raw)?_raw[0]:_raw.i;
+        try{
+          var _ch=new Chess(_fen);var _mv=_mvs.split(" ");
+          _ch.move({from:_mv[0].slice(0,2),to:_mv[0].slice(2,4),promotion:_mv[0][4]||"q"});
+          curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_rat,themes:_thm,id:_id};
+          _pzShowingSolution=false;
+          chess.load(curPz.fen);
+          drawPuzzle();
+        }catch(e){}
+        return;
+      }
+    }
+    /* show loading */
+    var _pr=document.getElementById("prompt");
+    if(_pr)_pr.innerHTML="<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading "+_th.replace(/([A-Z])/g," $1").trim()+"...</div>";
+    /* fetch theme_docs index - get ALL bands then find closest */
+    firebase.database().ref("/theme_docs/"+_th).once("value").then(function(s){
+      var allBands=s.val();
+      if(!allBands){newPuzzle();return;}
+      var _r=1500;try{if(window.myGlicko&&window.myGlicko.rating)_r=Math.round(window.myGlicko.rating);}catch(e){}
+      var bands=Object.keys(allBands).map(Number).sort(function(a,b){return Math.abs(a-_r)-Math.abs(b-_r);});
+      function tryBand(i){
+        if(i>=bands.length){newPuzzle();return;}
+        var b=bands[i];
+        var docs=allBands[String(b)];
+        if(!docs||!docs.length){tryBand(i+1);return;}
+        var docId=docs[Math.floor(Math.random()*docs.length)];
+        _db.collection("puzzle_paths").doc(docId).get().then(function(snap){
+          if(!snap.exists){tryBand(i+1);return;}
+          var found=null;
+          (snap.data().puzzles||[]).forEach(function(p){
+            if(!found&&(p.t||[]).indexOf(_thIdx)>-1)found=p;
+          });
+          if(found){
+            var _fen2=found.f+" - 0 1";
+            var _thm2=(found.t||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ");
+            try{
+              var _ch2=new Chess(_fen2);var _mv2=found.m.split(" ");
+              _ch2.move({from:_mv2[0].slice(0,2),to:_mv2[0].slice(2,4),promotion:_mv2[0][4]||"q"});
+              curPz={fen:_ch2.fen(),sol:_mv2.slice(1),color:_ch2.turn(),rating:found.r,themes:_thm2,id:found.i};
+              _pzShowingSolution=false;
+              chess.load(curPz.fen);
+              drawPuzzle();
+            }catch(e){tryBand(i+1);}
+          }else{tryBand(i+1);}
+        }).catch(function(){tryBand(i+1);});
+      }
+      tryBand(0);
+    }).catch(function(){newPuzzle();});
+    return;
+  }
+
+  /* SGM theme v10 */
+  if(window.FST && window.FST.themeFilter) {
+    var _th = window.FST.themeFilter;
     var _pool = (window.FST && window.FST.pool) || [];
     for(var _i=0; _i<_pool.length; _i++) {
       if((_pool[_i][4]||"").split(" ").indexOf(_th) > -1) {
@@ -6276,7 +6347,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776599817 -->
+<!-- sgm:1776600657 -->
 
 <script id="fst-engine">
 (function(){
@@ -6845,6 +6916,7 @@ window.addEventListener('load', function(){
   else { poll(); }
 })();
 </script>
+
 
 
 
