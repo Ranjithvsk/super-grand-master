@@ -5670,6 +5670,72 @@ function updLeaderboard() {
 
 
 function newPuzzle(){
+  /* SGM theme v10 */
+  if(window.FST && window.FST.themeFilter) {
+    var _th = window.FST.themeFilter;
+    var _pool = (window.FST && window.FST.pool) || [];
+    for(var _i=0; _i<_pool.length; _i++) {
+      if((_pool[_i][4]||"").split(" ").indexOf(_th) > -1) {
+        var _raw = _pool.splice(_i,1)[0];
+        try {
+          var _ch=new Chess(_raw[1]); var _mv=_raw[2].split(" ");
+          _ch.move({from:_mv[0].slice(0,2),to:_mv[0].slice(2,4),promotion:_mv[0][4]||"q"});
+          curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_raw[3],themes:_raw[4]||"",id:_raw[0]};
+          _pzShowingSolution=false;
+          chess=new Chess(curPz.fen);
+          cgPuzzle.set({fen:curPz.fen,orientation:curPz.color==="w"?"white":"black",turnColor:curPz.color==="w"?"white":"black",movable:{color:curPz.color==="w"?"white":"black"},lastMove:undefined,check:false,selected:undefined});
+          drawPuzzle();
+        } catch(e) { }
+        return;
+      }
+    }
+    if(!window.FST.db){setTimeout(newPuzzle,300);return;}
+    var _db=window.FST.db;
+    var _BM={300:200,400:200,500:200,600:400,700:400,800:600,900:900,1000:900,1100:900,1200:860,1300:900,1400:860,1500:860,1600:800,1700:600,1800:600,1900:600,2000:600,2100:400,2200:400,2300:200};
+    var _r=1500;try{if(window.myGlicko&&window.myGlicko.rating)_r=Math.round(window.myGlicko.rating);}catch(e){}
+    var _b=Math.floor(Math.max(300,Math.min(3200,_r))/100)*100;
+    var _bs=[_b,_b-100,_b+100,_b-200,_b+200,_b-300,_b+300].filter(function(x){return x>=300&&x<=3200;});
+    var _T=window.FST_THEMES||[];
+    var pr=document.getElementById("prompt");
+    if(pr)pr.innerHTML="<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading "+_th.replace(/([A-Z])/g," $1").trim()+"...</div>";
+    function _tryB(i){
+      if(i>=_bs.length){
+        var mx=_BM[_b]||860;
+        _db.collection("puzzle_paths").doc(_b+"_"+String(Math.floor(Math.random()*mx)).padStart(4,"0")).get().then(function(s){
+          if(s.exists)(s.data().puzzles||[]).forEach(function(p){var rr=Array.isArray(p)?p:[p.i,p.f+" - 0 1",p.m,p.r,(_T||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ")];if(!(window.FST.pool||[]).some(function(x){return x[0]===rr[0];})) (window.FST.pool=window.FST.pool||[]).push(rr);});
+          newPuzzle();
+        }).catch(function(){});
+        return;
+      }
+      firebase.database().ref("/theme_docs/"+_th+"/"+_bs[i]).once("value").then(function(s){
+        var docs=s.val();if(!docs||!docs.length){_tryB(i+1);return;}
+        var docId=docs[Math.floor(Math.random()*docs.length)];
+        _db.collection("puzzle_paths").doc(docId).get().then(function(snap){
+          if(!snap.exists){_tryB(i+1);return;}
+          var match=null;
+          (snap.data().puzzles||[]).forEach(function(p){
+            var rr=Array.isArray(p)?p:[p.i,p.f+" - 0 1",p.m,p.r,(_T||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ")];
+            if(!(window.FST.pool||[]).some(function(x){return x[0]===rr[0];})) (window.FST.pool=window.FST.pool||[]).push(rr);
+            if(!match&&(rr[4]||"").split(" ").indexOf(_th)>-1) match=rr;
+          });
+          if(match){
+            try{
+              var _ch2=new Chess(match[1]);var _mv2=match[2].split(" ");
+              _ch2.move({from:_mv2[0].slice(0,2),to:_mv2[0].slice(2,4),promotion:_mv2[0][4]||"q"});
+              curPz={fen:_ch2.fen(),sol:_mv2.slice(1),color:_ch2.turn(),rating:match[3],themes:match[4]||"",id:match[0]};
+              _pzShowingSolution=false;
+              chess=new Chess(curPz.fen);
+              cgPuzzle.set({fen:curPz.fen,orientation:curPz.color==="w"?"white":"black",turnColor:curPz.color==="w"?"white":"black",movable:{color:curPz.color==="w"?"white":"black"},lastMove:undefined,check:false,selected:undefined});
+              drawPuzzle();
+            }catch(e){_tryB(i+1);}
+          } else { _tryB(i+1); }
+        }).catch(function(){_tryB(i+1);});
+      }).catch(function(){_tryB(i+1);});
+    }
+    _tryB(0);
+    return;
+  }
+
   /* SGM theme v10: theme filter check */
   if(window.FST && window.FST.themeFilter && window.FST._themePending) {
     var _pendingRaw = window.FST._themePending;
@@ -6210,7 +6276,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776598671 -->
+<!-- sgm:1776599817 -->
 
 <script id="fst-engine">
 (function(){
@@ -6781,19 +6847,15 @@ window.addEventListener('load', function(){
 </script>
 
 
+
 <script>
 /* SGM theme wire v10 */
 (function(){
-  window.FST=window.FST||{};window.FST.themeFilter="";window.FST._themeFetching=false;
+  window.FST=window.FST||{};window.FST.themeFilter="";
   function wire(){
     var sel=document.getElementById("theme-select")||document.querySelector("select");
     if(!sel){setTimeout(wire,300);return;}
-    sel.onchange=function(){
-      window.FST.themeFilter=sel.value||"";
-      window.FST._themeFetching=false;
-      window.FST._themePending=null;
-      newPuzzle();
-    };
+    sel.onchange=function(){window.FST.themeFilter=sel.value||"";newPuzzle();};
   }
   if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(wire,500);});}
   else{setTimeout(wire,500);}
