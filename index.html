@@ -5670,6 +5670,63 @@ function updLeaderboard() {
 
 
 function newPuzzle(){
+  /* SGM theme v10: theme filter check */
+  if(window.FST && window.FST.themeFilter && window.FST._themePending) {
+    var _pendingRaw = window.FST._themePending;
+    window.FST._themePending = null;
+    /* Put matching puzzle at front of pool so normal newPuzzle picks it */
+    window.FST.pool = window.FST.pool || [];
+    window.FST.pool.unshift(_pendingRaw);
+    /* Fall through to normal newPuzzle() execution */
+  } else if(window.FST && window.FST.themeFilter && !window.FST._themeFetching) {
+    var _th2 = window.FST.themeFilter;
+    var _pool2 = window.FST.pool || [];
+    /* Check pool for matching puzzle */
+    for(var _j=0; _j<_pool2.length; _j++) {
+      if((_pool2[_j][4]||"").split(" ").indexOf(_th2) > -1) {
+        /* Move matching puzzle to front */
+        var _matched = _pool2.splice(_j,1)[0];
+        _pool2.unshift(_matched);
+        window.FST.pool = _pool2;
+        break;
+      }
+    }
+    /* If still no match at front, fetch async then re-call */
+    if(!(window.FST.pool[0]&&(window.FST.pool[0][4]||"").split(" ").indexOf(_th2)>-1)) {
+      if(!window.FST.db){setTimeout(newPuzzle,300);return;}
+      window.FST._themeFetching = true;
+      var _db2=window.FST.db;
+      var _BM2={300:200,400:200,500:200,600:400,700:400,800:600,900:900,1000:900,1100:900,1200:860,1300:900,1400:860,1500:860,1600:800,1700:600,1800:600,1900:600,2000:600,2100:400,2200:400,2300:200};
+      var _r2=1500;try{if(window.myGlicko&&window.myGlicko.rating)_r2=Math.round(window.myGlicko.rating);}catch(e){}
+      var _b2=Math.floor(Math.max(300,Math.min(3200,_r2))/100)*100;
+      var _bs2=[_b2,_b2-100,_b2+100,_b2-200,_b2+200,_b2-300,_b2+300].filter(function(x){return x>=300&&x<=3200;});
+      var _T2=window.FST_THEMES||[];
+      var pr2=document.getElementById("prompt");
+      if(pr2)pr2.innerHTML="<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading "+_th2.replace(/([A-Z])/g," $1").trim()+"...</div>";
+      function _tryB2(i){
+        if(i>=_bs2.length){window.FST._themeFetching=false;return;}
+        firebase.database().ref("/theme_docs/"+_th2+"/"+_bs2[i]).once("value").then(function(s){
+          var docs=s.val();if(!docs||!docs.length){_tryB2(i+1);return;}
+          var docId=docs[Math.floor(Math.random()*docs.length)];
+          _db2.collection("puzzle_paths").doc(docId).get().then(function(snap){
+            if(!snap.exists){_tryB2(i+1);return;}
+            var match=null;
+            (snap.data().puzzles||[]).forEach(function(p){
+              var rr=Array.isArray(p)?p:[p.i,p.f+" - 0 1",p.m,p.r,(_T2||[]).map(function(k){return _T2[k]||"";}).filter(Boolean).join(" ")];
+              if(!(window.FST.pool||[]).some(function(x){return x[0]===rr[0];})) (window.FST.pool=window.FST.pool||[]).push(rr);
+              if(!match&&(rr[4]||"").split(" ").indexOf(_th2)>-1) match=rr;
+            });
+            window.FST._themeFetching=false;
+            if(match){window.FST._themePending=match;newPuzzle();}
+            else{_tryB2(i+1);}
+          }).catch(function(){_tryB2(i+1);});
+        }).catch(function(){_tryB2(i+1);});
+      }
+      _tryB2(0);
+      return;
+    }
+  }
+
   /* SGM theme v10 */
   if(window.FST && window.FST.themeFilter) {
     var _th = window.FST.themeFilter;
@@ -6153,7 +6210,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776594122 -->
+<!-- sgm:1776598671 -->
 
 <script id="fst-engine">
 (function(){
@@ -6723,14 +6780,20 @@ window.addEventListener('load', function(){
 })();
 </script>
 
+
 <script>
 /* SGM theme wire v10 */
 (function(){
-  window.FST=window.FST||{};window.FST.themeFilter="";
+  window.FST=window.FST||{};window.FST.themeFilter="";window.FST._themeFetching=false;
   function wire(){
     var sel=document.getElementById("theme-select")||document.querySelector("select");
     if(!sel){setTimeout(wire,300);return;}
-    sel.onchange=function(){window.FST.themeFilter=sel.value||"";newPuzzle();};
+    sel.onchange=function(){
+      window.FST.themeFilter=sel.value||"";
+      window.FST._themeFetching=false;
+      window.FST._themePending=null;
+      newPuzzle();
+    };
   }
   if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(wire,500);});}
   else{setTimeout(wire,500);}
