@@ -240,7 +240,10 @@ body{font-family:'Noto Sans',sans-serif;background:#161512;color:#bababa;overflo
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script></head>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script><style>/* SGM_ICON_FIX */
+.puzzle__feedback .icon{opacity:1!important;color:#ccc!important;}
+</style>
+</head>
 <body>
 
 <!-- TOP NAV -->
@@ -5688,7 +5691,7 @@ function newPuzzle(){
           var _ch=new Chess(_fen);var _mv=_p[2].split(" ");
           _ch.move({from:_mv[0].slice(0,2),to:_mv[0].slice(2,4),promotion:_mv[0][4]||"q"});
           curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_p[3],themes:_thm,id:_p[0]};
-          _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
+          var _ml=document.getElementById("movesList");if(_ml)_ml.innerHTML="<table></table>";_pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
         }catch(e){}
         return;
       }
@@ -5722,7 +5725,7 @@ function newPuzzle(){
               var _ch2=new Chess(_fen2);var _mv2=found.m.split(" ");
               _ch2.move({from:_mv2[0].slice(0,2),to:_mv2[0].slice(2,4),promotion:_mv2[0][4]||"q"});
               curPz={fen:_ch2.fen(),sol:_mv2.slice(1),color:_ch2.turn(),rating:found.r,themes:_thm2,id:found.i};
-              _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
+              var _ml=document.getElementById("movesList");if(_ml)_ml.innerHTML="<table></table>";_pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
             }catch(e){tryBand(i+1);}
           }else{tryBand(i+1);}
         }).catch(function(){tryBand(i+1);});
@@ -6409,7 +6412,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776620744 -->
+<!-- sgm:1776622448 -->
 
 <script id="fst-engine">
 (function(){
@@ -6619,65 +6622,33 @@ window.addEventListener('load', function(){
 })();
 </script>
 <script>
-/* BUG3-FIX: populate nav Glicko rating badge */
+/* BUG3-FIX-V2: nav rating from RTDB on auth */
 (function(){
-  function _setNR(t){
-    var e=document.getElementById('nav-rating');
-    if(e&&t){e.textContent=t;e.style.display='inline';}
-  }
-  /* Poll lb-your-rating (set when leaderboard tab opens) */
-  var _p=setInterval(function(){
-    var yr=document.getElementById('lb-your-rating');
-    if(yr&&yr.textContent.trim()){_setNR(yr.textContent.trim());clearInterval(_p);}
-  },800);
-  /* Also read directly from RTDB after auth */
-  var _a=setInterval(function(){
-    if(typeof firebase==='undefined'||!firebase.auth){return;}
-    clearInterval(_a);
-    firebase.auth().onAuthStateChanged(function(u){
-      if(!u)return;
-      var ref=firebase.database&&firebase.database().ref('users/'+u.uid+'/glicko');
-      if(!ref)return;
-      ref.once('value').then(function(s){
-        var g=s.val();
-        if(g&&g.rating){
-          var prov=(Math.round(g.rd||0)>110)?'?':'';
-          _setNR(Math.round(g.rating)+prov);
-        }
-      }).catch(function(){});
+  firebase.auth().onAuthStateChanged(function(user){
+    if(!user) return;
+    firebase.database().ref("/users/"+user.uid+"/glicko").once("value").then(function(s){
+      var g=s.val();
+      if(!g||!g.r) return;
+      window.myGlicko={rating:g.r,rd:g.rd,vol:g.vol};
+      var el=document.getElementById("nav-rating");
+      if(el){el.textContent=Math.round(g.r)+(g.rd>110?"?":"");el.style.display="inline";}
     });
-  },600);
+  });
 })();
 </script>
 <script>
-/* BUG3-FIX: populate nav Glicko rating badge */
+/* BUG3-FIX-V2: nav rating from RTDB on auth */
 (function(){
-  function _setNR(t){
-    var e=document.getElementById('nav-rating');
-    if(e&&t){e.textContent=t;e.style.display='inline';}
-  }
-  /* Poll lb-your-rating (set when leaderboard tab opens) */
-  var _p=setInterval(function(){
-    var yr=document.getElementById('lb-your-rating');
-    if(yr&&yr.textContent.trim()){_setNR(yr.textContent.trim());clearInterval(_p);}
-  },800);
-  /* Also read directly from RTDB after auth */
-  var _a=setInterval(function(){
-    if(typeof firebase==='undefined'||!firebase.auth){return;}
-    clearInterval(_a);
-    firebase.auth().onAuthStateChanged(function(u){
-      if(!u)return;
-      var ref=firebase.database&&firebase.database().ref('users/'+u.uid+'/glicko');
-      if(!ref)return;
-      ref.once('value').then(function(s){
-        var g=s.val();
-        if(g&&g.rating){
-          var prov=(Math.round(g.rd||0)>110)?'?':'';
-          _setNR(Math.round(g.rating)+prov);
-        }
-      }).catch(function(){});
+  firebase.auth().onAuthStateChanged(function(user){
+    if(!user) return;
+    firebase.database().ref("/users/"+user.uid+"/glicko").once("value").then(function(s){
+      var g=s.val();
+      if(!g||!g.r) return;
+      window.myGlicko={rating:g.r,rd:g.rd,vol:g.vol};
+      var el=document.getElementById("nav-rating");
+      if(el){el.textContent=Math.round(g.r)+(g.rd>110?"?":"");el.style.display="inline";}
     });
-  },600);
+  });
 })();
 </script>
 
