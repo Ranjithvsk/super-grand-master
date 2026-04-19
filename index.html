@@ -5677,6 +5677,68 @@ function newPuzzle(){
     var _thIdx = _T.indexOf(_th);
     var _db = window.FST.db;
     if(!_db){setTimeout(newPuzzle,300);return;}
+    /* pool fast path */
+    var _pool = window.FST.pool || [];
+    for(var _i=0;_i<_pool.length;_i++){
+      if((_pool[_i].t||[]).indexOf(_thIdx)>-1){
+        var _p=_pool.splice(_i,1)[0];
+        try{
+          var _fen=_p.f+" - 0 1";
+          var _thm=(_p.t||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ");
+          var _ch=new Chess(_fen);var _mv=_p.m.split(" ");
+          _ch.move({from:_mv[0].slice(0,2),to:_mv[0].slice(2,4),promotion:_mv[0][4]||"q"});
+          curPz={fen:_ch.fen(),sol:_mv.slice(1),color:_ch.turn(),rating:_p.r,themes:_thm,id:_p.i};
+          _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
+        }catch(e){}
+        return;
+      }
+    }
+    /* show loading */
+    var _pr=document.getElementById("prompt");
+    if(_pr)_pr.innerHTML="<div class=\"result\" style=\"color:#aaa;font-size:14px\">Loading "+_th.replace(/([A-Z])/g," $1").trim()+"...</div>";
+    /* fetch theme_docs/{theme} - all bands at once, pick closest to rating */
+    firebase.database().ref("/theme_docs/"+_th).once("value").then(function(s){
+      var allBands=s.val();
+      if(!allBands){newPuzzle();return;}
+      var _r=1500;try{if(window.myGlicko&&window.myGlicko.rating)_r=Math.round(window.myGlicko.rating);}catch(e){}
+      var bands=Object.keys(allBands).map(Number).sort(function(a,b){return Math.abs(a-_r)-Math.abs(b-_r);});
+      function tryBand(i){
+        if(i>=bands.length){newPuzzle();return;}
+        var docs=allBands[String(bands[i])];
+        if(!docs||!docs.length){tryBand(i+1);return;}
+        var docId=docs[Math.floor(Math.random()*docs.length)];
+        _db.collection("puzzle_paths").doc(docId).get().then(function(snap){
+          if(!snap.exists){tryBand(i+1);return;}
+          var found=null;
+          (snap.data().puzzles||[]).forEach(function(p){
+            if(!found&&(p.t||[]).indexOf(_thIdx)>-1)found=p;
+            /* cache to pool */
+            if(!(window.FST.pool||[]).some(function(x){return x.i===p.i;})) (window.FST.pool=window.FST.pool||[]).push(p);
+          });
+          if(found){
+            try{
+              var _fen2=found.f+" - 0 1";
+              var _thm2=(found.t||[]).map(function(j){return _T[j]||"";}).filter(Boolean).join(" ");
+              var _ch2=new Chess(_fen2);var _mv2=found.m.split(" ");
+              _ch2.move({from:_mv2[0].slice(0,2),to:_mv2[0].slice(2,4),promotion:_mv2[0][4]||"q"});
+              curPz={fen:_ch2.fen(),sol:_mv2.slice(1),color:_ch2.turn(),rating:found.r,themes:_thm2,id:found.i};
+              _pzShowingSolution=false; chess.load(curPz.fen); drawPuzzle();
+            }catch(e){tryBand(i+1);}
+          }else{tryBand(i+1);}
+        }).catch(function(){tryBand(i+1);});
+      }
+      tryBand(0);
+    }).catch(function(){newPuzzle();});
+    return;
+  }
+
+  /* SGM theme v10 */
+  if(window.FST && window.FST.themeFilter) {
+    var _th = window.FST.themeFilter;
+    var _T = window.FST_THEMES || [];
+    var _thIdx = _T.indexOf(_th);
+    var _db = window.FST.db;
+    if(!_db){setTimeout(newPuzzle,300);return;}
     var _pool = window.FST.pool || [];
     /* pool fast path */
     for(var _i=0;_i<_pool.length;_i++){
@@ -6347,7 +6409,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776600657 -->
+<!-- sgm:1776601326 -->
 
 <script id="fst-engine">
 (function(){
@@ -6920,6 +6982,7 @@ window.addEventListener('load', function(){
 
 
 
+
 <script>
 /* SGM theme wire v10 */
 (function(){
@@ -6928,6 +6991,7 @@ window.addEventListener('load', function(){
     var sel=document.getElementById("theme-select")||document.querySelector("select");
     if(!sel){setTimeout(wire,300);return;}
     sel.onchange=function(){window.FST.themeFilter=sel.value||"";newPuzzle();};
+    console.log("[SGM v10] theme dropdown wired");
   }
   if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(wire,500);});}
   else{setTimeout(wire,500);}
