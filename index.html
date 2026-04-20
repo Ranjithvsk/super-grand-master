@@ -5595,7 +5595,7 @@ function saveGlicko(uid) {
 }
 
 function updNavElo() {
-  const el = document.getElementById('nav-elo');
+  const el = document.getElementById('nav-rating');
   if (!el) return;
   el.textContent = G2.display(myGlicko.rating, myGlicko.rd);
   el.className = 'lb-elo' + (myGlicko.rd > G2.PROV_RD ? ' prov' : '');
@@ -5631,7 +5631,7 @@ function updLeaderboard() {
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="4" class="lb-empty">Loading...</td></tr>';
   const user = firebase.auth().currentUser;
-  if (yourEl && user) yourEl.textContent = G2.display(myGlicko.rating, myGlicko.rd);
+  if (yourEl && user) var _lg = window.myGlicko || myGlicko; yourEl.textContent = G2.display(_lg.rating, _lg.rd);
   firebase.database().ref('users').once('value').then(snap => {
     const users = [];
     snap.forEach(child => {
@@ -6412,7 +6412,7 @@ if (window._cgReady) {
 
 
 
-<!-- sgm:1776622717 -->
+<!-- sgm:1776666500 -->
 
 <script id="fst-engine">
 (function(){
@@ -6636,21 +6636,7 @@ window.addEventListener('load', function(){
   });
 })();
 </script>
-<script>
-/* BUG3-FIX-V2: nav rating from RTDB on auth */
-(function(){
-  firebase.auth().onAuthStateChanged(function(user){
-    if(!user) return;
-    firebase.database().ref("/users/"+user.uid+"/glicko").once("value").then(function(s){
-      var g=s.val();
-      if(!g||!g.r) return;
-      window.myGlicko={rating:g.r,rd:g.rd,vol:g.vol};
-      var el=document.getElementById("nav-rating");
-      if(el){el.textContent=Math.round(g.r)+(g.rd>110?"?":"");el.style.display="inline";}
-    });
-  });
-})();
-</script>
+
 
 <script>
 /* fix_themes: populate all 69 FST_THEMES into theme dropdown */
